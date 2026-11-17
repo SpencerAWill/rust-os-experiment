@@ -10,8 +10,8 @@ Row statuses: `Planned`, `Drafting`, `Accepted`, `In progress`, `Done (PR #n)`, 
 
 | Milestone | Goal | Exit criteria | Status |
 |---|---|---|---|
-| M0 | Repository foundations | The workflow, CI, settings and research seed are merged; `/chunk next` starts M1.1 | Current |
-| M1 | Research and architecture decisions | ADRs accepted for the privilege model, the boot path and toolchain, the test strategy and `unsafe` policy, the exokernel interface, the shim's placement and the crate layout, each backed by a research note in `research/` | Next |
+| M0 | Repository foundations | The workflow, CI, settings and research seed are merged; `/chunk next` starts M1.1 | Done |
+| M1 | Research and architecture decisions | ADRs accepted for the privilege model, the boot path and toolchain, the test strategy and `unsafe` policy, the exokernel interface, the shim's placement and the crate layout, each backed by a research note in `research/` | Current |
 | M2 | Boot skeleton | One binary boots under QEMU on x86_64, aarch64 and riscv64, prints over serial, and is tested headless in CI | Later |
 | M3 | Exokernel core | Physical memory, capabilities and domains, tested on all three architectures | Later |
 | M4 | Two microkernels side by side | Two different microkernels or library OSes run at once on the exokernel and exchange a typed message (the first target milestone) | Later |
@@ -21,7 +21,7 @@ Row statuses: `Planned`, `Drafting`, `Accepted`, `In progress`, `Done (PR #n)`, 
 
 | Chunk | Title | Depends on | Status | Spec and plan |
 |---|---|---|---|---|
-| M0.0 | Repository foundations: the chunk workflow with build and research chunks, agent roles and skills, the push guard, `cargo xtask` process checks, CI, Pulumi-managed settings, the issue Project, ADRs 0001-0002, research notes from the initial architecture conversation | none | In progress | [spec](chunks/m0.0-foundations/spec.md), [plan](chunks/m0.0-foundations/plan.md) |
+| M0.0 | Repository foundations: the chunk workflow with build and research chunks, agent roles and skills, the push guard, `cargo xtask` process checks, CI, Pulumi-managed settings, the issue Project, ADRs 0001-0002, research notes from the initial architecture conversation | none | Done (PR #1) | [spec](chunks/m0.0-foundations/spec.md), [plan](chunks/m0.0-foundations/plan.md) |
 
 ## M1 chunks (research)
 

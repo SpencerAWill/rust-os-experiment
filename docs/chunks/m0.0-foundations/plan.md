@@ -1,6 +1,6 @@
 # M0.0 plan: repository foundations
 
-- **Status:** Accepted (2026-11-17).
+- **Status:** Historical: executed in PR #1 (2026-11-17); the spec and the code are authoritative.
 - **Spec:** [spec.md](spec.md) (from `bootstrap-design.md`, approved 2026-11-17). This plan argues from the spec; read both. Progress and surprises go in [log.md](log.md).
 
 > **For agentic workers:** executed by the chunk loop as ported here: the main session does documentation, configuration and GitHub steps; a `builder` does code steps (xtask, Pulumi TypeScript); reviewers in step 10. Steps use checkboxes, ticked in each step's commit.
@@ -113,7 +113,7 @@ Copy each engine file into the new tree, then edit it down; never regenerate fro
 
 ### Step 11: compound, PR, GitHub objects, close out
 
-- [ ] **Who:** main session
+- [x] **Who:** main session
 - **Do, in order:**
   1. Stage 6: `lesson?` lines from `log.md` through the capture gate into `docs/lessons/`; commit `docs: record the lessons of M0.0 (M0.0)`.
   2. Push the branch; open the PR from the template (title `feat: repository foundations (M0.0)`), saying an assistant was used.
@@ -147,4 +147,5 @@ From the engine's `docs/lessons/` (this chunk ports them; they apply to the same
 - **`xtask test` skips doctests while no workspace member has a library target** (`cargo test --doc` fails outright otherwise), with a test for the detection.
 - **`.cargo/config.toml`** (the `xtask` alias) was missing from the port list and was added.
 - **`.github` is not in `REQUIRED_READMES`:** GitHub would show `.github/README.md` instead of the root README.
+- **Step 10 (review) was not run** and step 11 left the M1 issues for after `pulumi up` (the `research` label does not exist before it); both are in the PR.
 - **`pulumi config set github:owner SpencerAWill`** was needed for the preview; it is in `Pulumi.prod.yaml`.

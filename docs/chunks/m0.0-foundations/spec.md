@@ -1,6 +1,6 @@
 # M0.0: Repository foundations
 
-- **Status:** Accepted (2026-11-17).
+- **Status:** Implemented (PR #1, 2026-11-17).
 - **Kind:** build · **Milestone:** M0 (repository foundations) · **Depends on:** none · **Decides:** ADR 0001, ADR 0002
 - **Issue:** none
 

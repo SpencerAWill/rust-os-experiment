@@ -21,7 +21,7 @@ Declared in [`infra/github`](../infra/github/README.md) (Pulumi): repository set
 
 The path from an idea to a chunk is in [workflow.md](workflow.md#from-issue-to-chunk). This section is the Project's configuration, which lives in GitHub, not in the repository. `/triage` checks the live Project against these names and stops if they differ.
 
-- **Project:** "OS backlog", number <number>, user-owned (`SpencerAWill`; `gh project list --owner SpencerAWill` finds it by title), public, linked to this repository.
+- **Project:** "OS backlog", number 8, user-owned (`SpencerAWill`; `gh project list --owner SpencerAWill` finds it by title), public, linked to this repository.
 - **Status:** Inbox, Ready, Scheduled, Done. **Priority:** Now, Next, Later. **Size:** S, M, L, XL. All single-select. **Priority** Now: blocks current work; Next: a candidate for the next few chunks; Later: worth doing, not soon. **Size** S: under about 100 changed lines or a short note; M: one ordinary chunk; L: a large chunk; XL: more than one chunk, so split it first.
 - **Labels** are declared in `infra/github/index.ts`. Every issue carries exactly one type label (`bug`, `enhancement`, `infrastructure`, `documentation`, `research`); `performance` and `needs-measurement` are additive; `area:*` is for code and tools. `research` issues are scheduled work like any other, not an icebox; an idea parked for later stays in the Inbox with Priority Later.
 - **Tracking issues:** one per roadmap milestone and one per multi-chunk effort, with sub-issues. Close a milestone's when the milestone completes.
