@@ -1,0 +1,3 @@
+# Spell-check configuration for `cargo xtask typos` (the `typos` tool).
+
+[default.extend-words]
