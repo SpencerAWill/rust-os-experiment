@@ -35,7 +35,7 @@ Nothing about the OS is designed here. Designs, specs and ADRs start from scratc
 
 - Engine-specific rules leaking in (for example, `forbid(unsafe_code)` presented as a project policy, or the `HashMap` bans), because a kernel needs `unsafe` and global per-CPU state, and these decisions belong to the OS's own ADRs.
 - Research documents that read as decisions. The transcript is one AI model's output; its claims are unverified and some are wrong (§6.3).
-- Copying the raw transcript into the repository.
+- Copying the raw transcript into the repository *(amended 2026-11-19: the maintainer asked for it to be committed, as a source under `docs/research/sources/`, not as research notes)*.
 
 ## 3. Constraints
 
@@ -200,7 +200,7 @@ At least these, so the research does not inherit them:
 - Which engine lessons are ported (§5.2).
 - Toolchain pinned to the engine's stable 1.100.0 for now.
 - The M1 chunk list and order (§6.2).
-- The raw transcript is not committed.
+- The raw transcript is not committed *(amended 2026-11-19 by the maintainer: committed under `docs/research/sources/`)*.
 - The shape of research chunks within the maintainer's choice (§5.6a): the `researcher` and `review-sources` agents, their models and tools, spikes allowed.
 - The Project's built-in workflows are a maintainer UI step; Pulumi imports the existing repository; the main session runs `pulumi preview` before the PR (§5.2, §5.6).
 

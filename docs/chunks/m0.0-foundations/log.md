@@ -11,3 +11,4 @@
 - 2026-11-17 done PR #1 opened. Project "OS backlog" #8 created and linked; Priority and Size fields added; the built-in Status field's options set to Inbox, Ready, Scheduled, Done through the GraphQL `updateProjectV2Field` mutation (`gh project field-create` cannot change the built-in field).
 - 2026-11-17 decision Review stage (step 10) not run, to save usage at the maintainer's request; recorded in the PR's Reviews section. M1 issues deferred until `pulumi up` creates the `research` label.
 - 2026-11-17 lesson? A new Project starts with Status options Todo, In Progress, Done; only GraphQL can replace them.
+- 2026-11-19 decision Maintainer asked to move `transcripts.txt` from the engine repo into this one: committed as `docs/research/sources/gemini-architecture-conversation.txt`, linked from the notes, excluded from `typos`; the spec notes the amendment.
