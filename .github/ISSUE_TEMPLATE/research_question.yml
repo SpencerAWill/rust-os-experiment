@@ -1,0 +1,45 @@
+name: Research question
+description: A question that needs research (reading, or a spike) before something can be decided
+labels: ["research"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Research questions are scheduled work: a research chunk answers one with a note in `docs/research/` and, when it decides something, an ADR (see [the workflow](https://github.com/SpencerAWill/rust-os-experiment/blob/main/docs/workflow.md#research-chunks)).
+  - type: textarea
+    id: question
+    attributes:
+      label: The question
+      description: One question, specific enough that you would recognize an answer.
+    validations:
+      required: true
+  - type: textarea
+    id: why
+    attributes:
+      label: Why it matters
+      description: What decision or work is blocked until it is answered.
+    validations:
+      required: true
+  - type: textarea
+    id: answer
+    attributes:
+      label: What would answer it
+      description: The evidence that would settle it (a manual section, a specification, a measurement, a spike that runs).
+    validations:
+      required: true
+  - type: textarea
+    id: sources
+    attributes:
+      label: Sources to start from
+      description: Links, manuals, papers, or notes in docs/research/.
+  - type: textarea
+    id: depends
+    attributes:
+      label: Depends on
+      description: Other issues or chunks, by number or ID.
+  - type: checkboxes
+    id: assistant
+    attributes:
+      label: Drafting
+      options:
+        - label: An assistant drafted this issue.

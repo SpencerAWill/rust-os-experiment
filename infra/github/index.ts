@@ -1,0 +1,227 @@
+// GitHub configuration for SpencerAWill/rust-os-experiment, declared with Pulumi.
+//
+// Run locally (state is kept in Pulumi Cloud; nothing runs there):
+//   pnpm install && cd infra/github
+//   export GITHUB_TOKEN="$(gh auth token)"
+//   pulumi preview      # review the diff
+//   pulumi up           # apply it
+//
+// Everything below is the desired state. Changing a setting in the GitHub UI creates drift that
+// the next `pulumi up` reverts, so make changes here instead.
+
+import * as github from "@pulumi/github";
+import * as pulumi from "@pulumi/pulumi";
+
+import { PrivateVulnerabilityReporting } from "./privateVulnerabilityReporting";
+
+const config = new pulumi.Config();
+const repoName = "rust-os-experiment";
+
+// ---------------------------------------------------------------------------------------------
+// Repository settings
+// ---------------------------------------------------------------------------------------------
+
+const repo = new github.Repository(
+    "repo",
+    {
+        name: repoName,
+        description: "Experimenting with an exokernel, an interposition shim and microkernels in Rust (x86_64, aarch64, riscv64)",
+        visibility: "public",
+
+        hasIssues: true,
+        // Repository Projects are on so the backlog's user-owned Project (docs/maintainers.md,
+        // "Issue tracking") shows on the repository page; M3.9 had them off while nothing used them.
+        // No wiki: the design record is docs/.
+        hasProjects: true,
+        hasWiki: false,
+        // Questions go here, not to issues (the issue chooser links to it: .github/ISSUE_TEMPLATE/config.yml).
+        hasDiscussions: true,
+
+        // Squash only: one commit per pull request on main, titled by the pull request (the main
+        // ruleset below enforces the same). The merge-commit settings are gone with that method.
+        allowMergeCommit: false,
+        allowSquashMerge: true,
+        allowRebaseMerge: false,
+        allowAutoMerge: false,
+        allowUpdateBranch: false,
+        deleteBranchOnMerge: true,
+        // PR_TITLE, not COMMIT_OR_PR_TITLE: a one-commit pull request would otherwise take that
+        // commit's subject, which may lack the chunk ID the title carries.
+        squashMergeCommitTitle: "PR_TITLE",
+        squashMergeCommitMessage: "COMMIT_MESSAGES",
+
+        topics: ["rust", "operating-system", "osdev", "exokernel", "microkernel"],
+
+        // Free on public repositories: catch committed credentials and block pushes containing them.
+        securityAndAnalysis: {
+            secretScanning: { status: "enabled" },
+            secretScanningPushProtection: { status: "enabled" },
+        },
+
+        // `pulumi destroy` must never delete the repository itself.
+        archiveOnDestroy: true,
+    },
+    // The repository was created by `gh repo create` before this stack existed, so the first `pulumi up`
+    // adopts it. `import` may be removed once that has run.
+    { protect: true, import: repoName },
+);
+
+const vulnerabilityAlerts = new github.RepositoryVulnerabilityAlerts("vulnerability-alerts", {
+    repository: repo.name,
+    enabled: true,
+});
+
+// Dependabot opens a pull request when an advisory affects a dependency. It needs alerts on.
+new github.RepositoryDependabotSecurityUpdates(
+    "dependabot-security-updates",
+    { repository: repo.name, enabled: true },
+    { dependsOn: [vulnerabilityAlerts] },
+);
+
+// Not in the provider (6.15.1), so a dynamic resource calls the REST API; see its file.
+new PrivateVulnerabilityReporting("private-vulnerability-reporting", {
+    owner: new pulumi.Config("github").require("owner"),
+    repository: repo.name,
+    enabled: true,
+});
+
+// ---------------------------------------------------------------------------------------------
+// Ruleset on the default branch
+// ---------------------------------------------------------------------------------------------
+
+// Job names in .github/workflows/ci.yml. Keep in sync when jobs are added, renamed or removed:
+// a required check that never reports blocks every pull request.
+const requiredChecks = [
+    "fmt",
+    "clippy",
+    "test",
+    "doc",
+    "check-workflows",
+    "check-docs",
+    "typos",
+    "deny",
+    "macos",
+];
+
+// GitHub Actions' app id: only results posted by Actions satisfy the checks.
+const githubActionsAppId = 15368;
+// Built-in "Admin" repository role.
+const adminRoleId = 5;
+
+new github.RepositoryRuleset("main-ruleset", {
+    name: "main",
+    repository: repo.name,
+    target: "branch",
+    enforcement: "active",
+    conditions: {
+        refName: { includes: ["~DEFAULT_BRANCH"], excludes: [] },
+    },
+    // Admins may bypass only through a pull request, so nobody pushes or force-pushes to main directly (spec M3.15 section 4.6).
+    bypassActors: [{ actorType: "RepositoryRole", actorId: adminRoleId, bypassMode: "pull_request" }],
+    rules: {
+        deletion: true,
+        nonFastForward: true,
+        pullRequest: {
+            // Sole maintainer: GitHub does not let an author approve their own pull request.
+            requiredApprovingReviewCount: 0,
+            dismissStaleReviewsOnPush: false,
+            requireCodeOwnerReview: false,
+            requireLastPushApproval: false,
+            requiredReviewThreadResolution: false,
+            allowedMergeMethods: ["squash"],
+        },
+        requiredLinearHistory: true,
+        requiredStatusChecks: {
+            strictRequiredStatusChecksPolicy: false,
+            requiredChecks: requiredChecks.map((context) => ({
+                context,
+                integrationId: githubActionsAppId,
+            })),
+        },
+    },
+});
+
+// ---------------------------------------------------------------------------------------------
+// Labels (authoritative: labels not listed here are deleted)
+// ---------------------------------------------------------------------------------------------
+
+const labels: { name: string; color: string; description: string }[] = [
+    { name: "bug", color: "d73a4a", description: "Something isn't working" },
+    { name: "documentation", color: "0075ca", description: "Improvements or additions to documentation" },
+    { name: "duplicate", color: "cfd3d7", description: "This issue or pull request already exists" },
+    { name: "enhancement", color: "a2eeef", description: "New feature or request" },
+    { name: "good first issue", color: "7057ff", description: "Good for newcomers" },
+    { name: "help wanted", color: "008672", description: "Extra attention is needed" },
+    { name: "invalid", color: "e4e669", description: "This doesn't seem right" },
+    { name: "question", color: "d876e3", description: "Further information is requested" },
+    { name: "wontfix", color: "ffffff", description: "This will not be worked on" },
+    // Applied by Dependabot (.github/dependabot.yml); it recreates them if they are missing.
+    { name: "dependencies", color: "0366d6", description: "Pull requests that update a dependency file" },
+    { name: "rust", color: "000000", description: "Pull requests that update rust code" },
+    { name: "github_actions", color: "000000", description: "Pull requests that update GitHub Actions code" },
+    // Assigned by the issue templates in .github/ISSUE_TEMPLATE/: keep their `labels:` in step
+    // with this list.
+    {
+        name: "infrastructure",
+        color: "bfd4f2",
+        description: "CI, tooling, repository layout or settings, contributor process",
+    },
+    { name: "performance", color: "f9d0c4", description: "A measured slowdown, speedup or memory change" },
+    // Applied by hand to research tracking issues (docs/research/) and the sub-issues spawned from them.
+    {
+        name: "research",
+        color: "c5def5",
+        description: "A question a research chunk answers (scheduled work)",
+    },
+    // Applied by /triage (.claude/skills/triage/); see docs/workflow.md, "From issue to chunk".
+    // `area:` is for code only; CI, docs and process issues use `infrastructure` and `documentation`.
+    { name: "area:xtask", color: "ededed", description: "The xtask command-line tool (xtask/)" },
+    { name: "area:docs", color: "ededed", description: "Documentation, the workflow and research notes (docs/)" },
+    {
+        name: "needs-measurement",
+        color: "fef2c0",
+        description: "Cannot be defined or scheduled until something is measured; the measurement is the first step",
+    },
+    { name: "ai-assisted", color: "d4c5f9", description: "An assistant drafted this issue" },
+];
+
+new github.IssueLabels("labels", { repository: repo.name, labels });
+
+// ---------------------------------------------------------------------------------------------
+// GitHub Actions
+// ---------------------------------------------------------------------------------------------
+
+new github.ActionsRepositoryPermissions("actions-permissions", {
+    repository: repo.name,
+    enabled: true,
+    allowedActions: "all",
+    // Matches `cargo xtask check-workflows` rule 1: third-party actions are pinned to a commit.
+    shaPinningRequired: true,
+});
+
+new github.WorkflowRepositoryPermissions("workflow-permissions", {
+    repository: repo.name,
+    defaultWorkflowPermissions: "read",
+    canApprovePullRequestReviews: false,
+});
+
+// Plain Actions variables: `pulumi config set --path 'actionsVariables.NAME' value`.
+const variables = config.getObject<Record<string, string>>("actionsVariables") ?? {};
+for (const [name, value] of Object.entries(variables)) {
+    new github.ActionsVariable(`variable-${name}`, { repository: repo.name, variableName: name, value });
+}
+
+// Actions secrets. Names are plain config so the set is known at preview time; each value is an
+// encrypted config entry:
+//   pulumi config set --path 'actionsSecretNames[0]' NAME
+//   pulumi config set --secret 'actionsSecret-NAME' value
+const secretNames = config.getObject<string[]>("actionsSecretNames") ?? [];
+for (const name of secretNames) {
+    new github.ActionsSecret(`secret-${name}`, {
+        repository: repo.name,
+        secretName: name,
+        plaintextValue: config.requireSecret(`actionsSecret-${name}`),
+    });
+}
+
+export const repositoryUrl = repo.htmlUrl;

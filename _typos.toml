@@ -1,0 +1,7 @@
+# Spell-check configuration for `cargo xtask typos` (the `typos` tool).
+
+[default.extend-words]
+
+[files]
+# Raw model output kept as a research source; not edited.
+extend-exclude = ["docs/research/sources/"]
