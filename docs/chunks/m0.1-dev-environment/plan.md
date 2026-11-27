@@ -90,7 +90,7 @@ Choices the spec leaves to implementation:
 
 ### Step 7: research note, sections 1-3 (R12 in part)
 
-- [ ] **Who:** researcher
+- [x] **Who:** researcher
 - **Files:** `docs/research/dev-environment.md`, `log.md`
 - **Test first:** the evidence per claim: versions and boots from `log.md` (measured here), the HVF patch series and Apple's EL2 support, AARCHMRS's licence text (read from the package, not inferred), UDB's state, Sail, Bochs' VMX option, Spike, Arm FVP hosts.
 - **Change:** provenance line and spec §4.5 topics 1-3; the reference library is cited by path.
@@ -137,3 +137,6 @@ Choices the spec leaves to implementation:
 - Step 3: `riscv64-opensbi` runs with `-bios default` but still requires check 4 to have found `opensbi-riscv64-generic-fw_dynamic.bin` (the file `default` loads); the spec does not say.
 - Step 5: `xtask/src/check_docs/readme.rs` also changed (its test counts `REQUIRED_READMES`, lesson docs-2), and `reference/README.md` moved `files/` and `text/` out of Contents. Doctor check 7 prints one summary line with the counts (§4.3's "the count missing or changed"); a present `manual` entry whose checksum changed fails `refs --fetch`, since it cannot be re-downloaded. Doctor's hand-written `rust-toolchain.toml` parser was replaced by `toml`.
 - Step 6: the RISC-V unprivileged and privileged manuals are one entry (`riscv-isa-manual`, the release's combined PDF), so the manifest has 21 entries for spec §4.4's 22 documents. Eight are `manual`: AMD's portal, Arm's five (no direct PDF URL), the gABI (HTML pages only) and the x86-64 psABI (a CI artifact).
+- Step 8 (maintainer's choice, 2026-11-27): topic 6 also lists three leads for M2, with citations and no decision: raw kernel images from ELF (`llvm-tools`, `cargo-binutils`), rust-analyzer's per-crate target for `no_std` crates, Homebrew version drift (`brew pin`).
+- Step 9 (maintainer's choice, 2026-11-27): "Setting up" also names the prerequisites (Homebrew, rustup, Xcode Command Line Tools).
+- Step 7: the note's entry in `docs/research/README.md` Contents is added with step 7, not step 9, because `check-docs` requires it as soon as the note exists.
