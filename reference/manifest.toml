@@ -31,7 +31,7 @@ title = "Arm Architecture Reference Manual for A-profile architecture (DDI 0487,
 version = "latest on the publisher's page; issue letter not confirmed (page unreadable on 2026-11-27)"
 url = "https://developer.arm.com/documentation/ddi0487/latest"
 format = "pdf"
-licence = "not read: the publisher's page returned HTTP 403 to automated clients; Arm's terms apply and are unverified here"
+licence = "not read: the publisher's page cannot be read by a script (HTTP 403 with a browser User-Agent, a page rendered by scripts without one); Arm's terms apply and are unverified here"
 manual = true
 how = "Open the URL, download the latest PDF of the Arm Architecture Reference Manual for A-profile architecture (accept Arm's terms if asked), save it at reference/files/arm-arm.pdf, then run `cargo xtask refs` for its digest and record the issue letter in `version`."
 
@@ -41,7 +41,7 @@ title = "Arm Generic Interrupt Controller Architecture Specification, GICv3 and 
 version = "latest on the publisher's page; issue letter not confirmed (page unreadable on 2026-11-27)"
 url = "https://developer.arm.com/documentation/ihi0069/latest"
 format = "pdf"
-licence = "not read: the publisher's page returned HTTP 403 to automated clients; Arm's terms apply and are unverified here"
+licence = "not read: the publisher's page cannot be read by a script (HTTP 403 with a browser User-Agent, a page rendered by scripts without one); Arm's terms apply and are unverified here"
 manual = true
 how = "Open the URL, download the latest PDF (accept Arm's terms if asked), save it at reference/files/arm-gic.pdf, then run `cargo xtask refs` for its digest and record the issue letter in `version`."
 
@@ -51,7 +51,7 @@ title = "Arm Power State Coordination Interface (PSCI, DEN 0022)"
 version = "latest on the publisher's page; issue not confirmed (page unreadable on 2026-11-27)"
 url = "https://developer.arm.com/documentation/den0022/latest"
 format = "pdf"
-licence = "not read: the publisher's page returned HTTP 403 to automated clients; Arm's terms apply and are unverified here"
+licence = "not read: the publisher's page cannot be read by a script (HTTP 403 with a browser User-Agent, a page rendered by scripts without one); Arm's terms apply and are unverified here"
 manual = true
 how = "Open the URL, download the latest PDF (accept Arm's terms if asked), save it at reference/files/arm-psci.pdf, then run `cargo xtask refs` for its digest and record the issue in `version`."
 
@@ -61,7 +61,7 @@ title = "Arm SMC Calling Convention (SMCCC, DEN 0028)"
 version = "latest on the publisher's page; issue not confirmed (page unreadable on 2026-11-27)"
 url = "https://developer.arm.com/documentation/den0028/latest"
 format = "pdf"
-licence = "not read: the publisher's page returned HTTP 403 to automated clients; Arm's terms apply and are unverified here"
+licence = "not read: the publisher's page cannot be read by a script (HTTP 403 with a browser User-Agent, a page rendered by scripts without one); Arm's terms apply and are unverified here"
 manual = true
 how = "Open the URL, download the latest PDF (accept Arm's terms if asked), save it at reference/files/arm-smccc.pdf, then run `cargo xtask refs` for its digest and record the issue in `version`."
 
@@ -80,7 +80,7 @@ title = "Arm Architecture Machine Readable Specification (AARCHMRS), A-profile o
 version = "2026-09 (from a third-party listing; not confirmed at the publisher)"
 url = "https://developer.arm.com/Architectures/A-Profile%20Architecture"
 format = "tar.gz"
-licence = "not read: the publisher's page returned HTTP 403 to automated clients; the package's own licence file is unverified here"
+licence = "not read: the publisher's page cannot be read by a script (HTTP 403 with a browser User-Agent, a page rendered by scripts without one); the package's own licence file is unverified here"
 manual = true
 how = "Open the URL, find the A-profile AARCHMRS open-source download (a tar.gz named like AARCHMRS_OPENSOURCE_A_profile-<date>.tar.gz) under Exploration Tools, accept the terms if asked, save it at reference/files/arm-aarchmrs.tar.gz, then run `cargo xtask refs` for its digest and record the release in `version`."
 
