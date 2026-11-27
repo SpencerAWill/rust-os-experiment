@@ -17,7 +17,7 @@ Choices the spec leaves to implementation:
 
 ### Step 1: toolchain, Brewfile, allow rules (R1, R2, R13 in part)
 
-- [ ] **Who:** main session
+- [x] **Who:** main session
 - **Files:** `rust-toolchain.toml`, `Brewfile`, `.claude/settings.json`, `log.md`
 - **Test first:** `brew bundle check --file Brewfile` fails before the file exists (`No such file`); `grep -c 'cargo xtask doctor' .claude/settings.json` prints 0.
 - **Change:** spec §4.1 and §4.2; add exactly `Bash(cargo xtask doctor)` and `Bash(cargo xtask refs)` to the allow list. Log the CI baseline: the `test` job took 25 s and `macos` 42 s in run 44574212098 on `d814fe0`.

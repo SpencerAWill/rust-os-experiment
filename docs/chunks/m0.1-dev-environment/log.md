@@ -18,3 +18,4 @@
 - 2026-11-27 done `lessons-researcher` (dispatched by name) returned xtask-1, xtask-2, tooling-3, specs-1 to specs-4, docs-1, docs-2; all followed (plan §4). No lesson covers child-process timeouts, curl with checksums, TOML parsing or note citations.
 - 2026-11-27 decision Plan: nine steps (main session 1, 4, 9; builder 2, 3, 5, 6; researcher 7, 8). Following docs-1, the "check `reference/text/` first" rule has one copy in `reference/README.md` and the three agent-facing files point to it.
 - 2026-11-27 done CI baseline before the toolchain change: run 44574212098 on `d814fe0`, `test` job 25 s (17:10:10 to 17:10:35), `macos` job 42 s.
+- 2026-11-27 done Step 1: `rustup show` lists the three targets; `rustup component list --installed` has rustfmt, clippy, rust-analyzer, llvm-tools, rust-src; `brew bundle check --file Brewfile` prints `The Brewfile's dependencies are satisfied.`; `cargo xtask ci --quick` passes (113 tests). The CI baseline is the line above.
