@@ -62,27 +62,34 @@ pub(crate) fn run_with_deadline(
 
 /// The leftover tagged QEMU processes among the pids in `pgrep -f` output: pid and program
 /// basename. Each pid is checked on its own with `ps`, so a process whose arguments forge a line
-/// is not believed; one that has exited (`ps` fails) is skipped.
-fn leftovers(runner: &dyn Runner, pgrep_output: &str) -> Vec<(u32, String)> {
-    let ps = |field: &str, id: &str| {
-        runner
-            .capture("ps", &["-o", field, "-p", id])
-            .ok()
-            .filter(|c| c.success)
-            .map(|c| c.text)
+/// is not believed; one that has exited (`ps` exits non-zero) is skipped, and a `ps` that cannot
+/// be started is an error. `-ww` because procps-ng takes the width from an exported `COLUMNS`
+/// even into a pipe.
+fn leftovers(runner: &dyn Runner, pgrep_output: &str) -> Result<Vec<(u32, String)>, String> {
+    let ps = |field: &str, id: &str| -> Result<Option<String>, String> {
+        let c = runner.capture("ps", &["-ww", "-o", field, "-p", id])?;
+        Ok(c.success.then_some(c.text))
     };
-    pgrep_output
+    let mut found = Vec::new();
+    for pid in pgrep_output
         .lines()
         .filter_map(|line| line.trim().parse::<u32>().ok())
-        .filter_map(|pid| {
-            let id = pid.to_string();
-            let comm = ps("comm=", &id)?;
-            let base = comm.trim().rsplit('/').next()?.to_string();
-            let args = ps("args=", &id)?;
-            (base.starts_with("qemu-system-") && args.contains("-name xtask-doctor-"))
-                .then_some((pid, base))
-        })
-        .collect()
+    {
+        let id = pid.to_string();
+        let Some(comm) = ps("comm=", &id)? else {
+            continue;
+        };
+        let Some(base) = comm.trim().rsplit('/').next().map(str::to_string) else {
+            continue;
+        };
+        let Some(args) = ps("args=", &id)? else {
+            continue;
+        };
+        if base.starts_with("qemu-system-") && args.contains("-name xtask-doctor-") {
+            found.push((pid, base));
+        }
+    }
+    Ok(found)
 }
 
 /// Kills every QEMU left by an earlier `doctor` (spec section 4.3, amendment of 2026-11-27).
@@ -94,7 +101,10 @@ fn sweep_within(runner: &dyn Runner, wait: Duration) -> Vec<Line> {
     const ITEM: &str = "leftover";
     let warn = |detail: String| Line::new(Status::Warn, C, ITEM, detail);
     let found = match runner.capture("pgrep", &["-f", "xtask-doctor-"]) {
-        Ok(c) if c.success => leftovers(runner, &c.text),
+        Ok(c) if c.success => match leftovers(runner, &c.text) {
+            Ok(found) => found,
+            Err(e) => return vec![warn(e)],
+        },
         Ok(c) if c.code == Some(1) => return Vec::new(),
         Ok(c) => return vec![warn(format!("`pgrep` failed: {}", c.text.trim()))],
         Err(e) => return vec![warn(e)],
@@ -690,8 +700,8 @@ mod tests {
         }
     }
 
-    /// A fake keyed on program and arguments: `pgrep`, `ps -o comm= -p <pid>`,
-    /// `ps -o args= -p <pid>`, `kill -KILL` and `kill -0`; records the calls. A pid missing from
+    /// A fake keyed on program and arguments: `pgrep`, `ps -ww -o comm= -p <pid>`,
+    /// `ps -ww -o args= -p <pid>`, `kill -KILL` and `kill -0`; records the calls. A pid missing from
     /// `procs` is gone (`ps` exits 1).
     struct Recording {
         pgrep: Result<Captured, String>,
@@ -699,6 +709,8 @@ mod tests {
         procs: Vec<(u32, &'static str, &'static str)>,
         alive: bool,
         kill0_cannot_start: bool,
+        ps_cannot_start: bool,
+        kill_exit: i32,
         eol: &'static str,
         calls: std::cell::RefCell<Vec<String>>,
     }
@@ -710,7 +722,8 @@ mod tests {
                 .push(format!("{program} {}", args.join(" ")));
             match (program, args) {
                 ("pgrep", _) => self.pgrep.clone(),
-                ("ps", ["-o", field @ ("comm=" | "args="), "-p", pid]) => {
+                ("ps", _) if self.ps_cannot_start => Err("cannot start `ps`: nope".into()),
+                ("ps", ["-ww", "-o", field @ ("comm=" | "args="), "-p", pid]) => {
                     let pid: u32 = pid.parse().unwrap();
                     Ok(match self.procs.iter().find(|p| p.0 == pid) {
                         Some(p) => {
@@ -719,6 +732,9 @@ mod tests {
                         }
                         None => reply(false, 1, ""),
                     })
+                }
+                ("kill", ["-KILL", _]) if self.kill_exit != 0 => {
+                    Ok(reply(false, self.kill_exit, "Operation not permitted"))
                 }
                 ("kill", ["-KILL", _]) => Ok(reply(true, 0, "")),
                 ("kill", ["-0", _]) if self.kill0_cannot_start => {
@@ -731,7 +747,7 @@ mod tests {
         }
     }
 
-    const PROCS: [(u32, &str, &str); 5] = [
+    const PROCS: [(u32, &str, &str); 7] = [
         (
             101,
             "qemu-system-riscv64",
@@ -751,6 +767,14 @@ mod tests {
         ),
         // Tagged, but not a QEMU binary.
         (606, "vim", "vim -name xtask-doctor-notes"),
+        // The pid the forged line names, alive and not QEMU.
+        (505, "bash", "bash"),
+        // Linux truncates `comm` to 15 characters.
+        (
+            808,
+            "qemu-system-ris",
+            "qemu-system-riscv64 -M virt -name xtask-doctor-x",
+        ),
     ];
 
     fn recording(pgrep: Result<Captured, String>, alive: bool) -> Recording {
@@ -759,14 +783,16 @@ mod tests {
             procs: PROCS.to_vec(),
             alive,
             kill0_cannot_start: false,
+            ps_cannot_start: false,
+            kill_exit: 0,
             eol: "\n",
             calls: std::cell::RefCell::default(),
         }
     }
 
     /// What `pgrep -f xtask-doctor-` prints for [`PROCS`], plus 505 (named by the forged line,
-    /// gone by the time `ps` runs) and 707 (gone).
-    const PGREP: &str = "101\n202\n303\n404\n505\n606\n707\n";
+    /// alive as `bash`), 707 (gone) and 808 (a 15-character `comm`).
+    const PGREP: &str = "101\n202\n303\n404\n505\n606\n707\n808\n";
 
     #[test]
     fn every_boot_has_no_network_and_a_name_tag() {
@@ -817,6 +843,7 @@ mod tests {
                 [
                     "warn smoke-boot leftover: killed pid 101 (qemu-system-riscv64)",
                     "warn smoke-boot leftover: killed pid 202 (qemu-system-riscv64)",
+                    "warn smoke-boot leftover: killed pid 808 (qemu-system-ris)",
                 ],
                 "{eol:?}"
             );
@@ -825,8 +852,15 @@ mod tests {
                 .iter()
                 .filter(|c| c.starts_with("kill -KILL"))
                 .collect();
-            assert_eq!(kills, ["kill -KILL 101", "kill -KILL 202"], "{eol:?}");
+            assert_eq!(
+                kills,
+                ["kill -KILL 101", "kill -KILL 202", "kill -KILL 808"],
+                "{eol:?}"
+            );
             assert_eq!(calls[0], "pgrep -f xtask-doctor-");
+            // The forged line's named victim is alive and is not QEMU: never killed.
+            assert!(!calls.iter().any(|c| c == "kill -KILL 505"), "{eol:?}");
+            assert!(calls.iter().any(|c| c == "ps -ww -o args= -p 101"));
         }
     }
 
@@ -842,10 +876,38 @@ mod tests {
     }
 
     #[test]
+    fn sweep_warns_once_when_ps_cannot_start() {
+        let mut r = recording(Ok(reply(true, 0, "101\n202\n")), false);
+        r.ps_cannot_start = true;
+        let lines = sweep(&r);
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(
+            lines[0]
+                .to_string()
+                .starts_with("warn smoke-boot leftover:"),
+            "{}",
+            lines[0]
+        );
+        assert!(lines[0].detail.contains("nope"), "{}", lines[0]);
+        assert!(!r.calls.borrow().iter().any(|c| c.starts_with("kill")));
+    }
+
+    #[test]
+    fn sweep_warns_once_when_kill_fails_and_does_not_wait() {
+        let mut r = recording(Ok(reply(true, 0, "101\n")), true);
+        r.kill_exit = 1;
+        let lines = sweep_within(&r, Duration::from_secs(30));
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert!(lines[0].detail.contains("`kill` failed"), "{}", lines[0]);
+        assert!(lines[0].detail.contains("101"), "{}", lines[0]);
+        assert!(!r.calls.borrow().iter().any(|c| c == "kill -0 101"));
+    }
+
+    #[test]
     fn sweep_says_so_when_a_leftover_survives_the_wait() {
         let r = recording(Ok(reply(true, 0, PGREP)), true);
         let lines = sweep_within(&r, Duration::from_millis(250));
-        assert_eq!(lines.len(), 2);
+        assert_eq!(lines.len(), 3);
         assert_eq!(
             lines[0].to_string(),
             "warn smoke-boot leftover: pid 101 (qemu-system-riscv64) still running"
@@ -857,9 +919,9 @@ mod tests {
         let dir = temp("sweep-prereq");
         let r = recording(Ok(reply(true, 0, PGREP)), false);
         let lines = check(&State::default(), &Ok(dir), true, &r);
-        assert_eq!(lines.len(), BOOTS.len() + 2);
+        assert_eq!(lines.len(), BOOTS.len() + 3);
         assert_eq!(lines[0].status, Status::Warn);
-        assert!(lines[2..].iter().all(|l| l.status == Status::Fail));
+        assert!(lines[3..].iter().all(|l| l.status == Status::Fail));
     }
 
     #[test]

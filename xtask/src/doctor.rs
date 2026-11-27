@@ -394,7 +394,12 @@ fn check_accelerator(runner: &dyn Runner, state: &State, mac_arm64: bool) -> Vec
     const C: &str = "accelerator";
     const ITEM: &str = "hvf";
     if !mac_arm64 {
-        return vec![Line::new(Status::Skip, C, ITEM, "not macOS arm64")];
+        return vec![Line::new(
+            Status::Skip,
+            C,
+            ITEM,
+            "xtask not built for macOS arm64",
+        )];
     }
     if !state.qemu_aarch64 {
         return vec![Line::new(
@@ -746,6 +751,11 @@ mod tests {
             check_accelerator(&Panics, &state, false)[0].status,
             Status::Skip
         );
+        assert!(
+            check_accelerator(&Panics, &state, false)[0]
+                .detail
+                .contains("xtask not built for macOS arm64")
+        );
         let with = Fake(vec![(
             "qemu-system-aarch64",
             Ok(ok(
@@ -1002,21 +1012,29 @@ mod tests {
 
     #[test]
     fn the_checks_run_in_the_order_of_spec_section_4_3() {
+        // Inputs that start nothing real: no program starts, and the root is unknown.
         let root = Err("unused".to_string());
-        let list = checks(&SystemRunner, &root, true);
+        let runner = Fake(vec![]);
+        let list = checks(&runner, &root, true);
+        let order = [
+            "toolchain",
+            "host-tools",
+            "qemu-version",
+            "firmware",
+            "accelerator",
+            "smoke-boot",
+            "reference-library",
+        ];
         let names: Vec<&str> = list.iter().map(|(name, _)| *name).collect();
-        assert_eq!(
-            names,
-            [
-                "toolchain",
-                "host-tools",
-                "qemu-version",
-                "firmware",
-                "accelerator",
-                "smoke-boot",
-                "reference-library",
-            ]
-        );
+        assert_eq!(names, order);
+        let mut state = State::default();
+        for (name, check) in &list {
+            let lines = check(&mut state);
+            assert!(!lines.is_empty(), "{name}");
+            for l in &lines {
+                assert_eq!(l.check, *name, "{l}");
+            }
+        }
     }
 
     fn references(statuses: &[RefStatus]) -> Vec<Line> {
