@@ -33,3 +33,5 @@ All the software layers can be Rust: user space, microkernels, the exokernel, a 
 ## Corrections
 
 - The conversation's sizes and times (bootloader sizes, "days instead of years" for VirtIO drivers) are unsourced.
+- "UTM is a front end to the same" does not mean that installing UTM gives QEMU: the UTM cask ships QEMU only as frameworks inside `UTM.app`, and no `qemu-system-*` was on `PATH` until `brew install qemu` (measured on 2026-11-27, [M0.1 log](../chunks/m0.1-dev-environment/log.md); [dev-environment §1](dev-environment.md#1-host-tools)).
+- The x86_64 EDK2 image cannot be given with `-bios`: `qemu-system-x86_64 -bios /opt/homebrew/share/qemu/edk2-x86_64-code.fd` exits 1 with `could not load PC BIOS`, while `-M q35 -drive if=pflash,format=raw,readonly=on,file=<edk2-x86_64-code.fd>` reaches the UEFI shell (QEMU 11.1.3, measured on 2026-11-27, [M0.1 log](../chunks/m0.1-dev-environment/log.md); [dev-environment §2](dev-environment.md#the-x86-uefi-image-must-be-pflash)). The aarch64 image does boot with `-bios`.

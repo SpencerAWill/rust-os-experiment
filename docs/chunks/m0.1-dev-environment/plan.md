@@ -99,7 +99,7 @@ Choices the spec leaves to implementation:
 
 ### Step 8: research note, sections 4-6, and the Corrections (R12)
 
-- [ ] **Who:** researcher
+- [x] **Who:** researcher
 - **Files:** `docs/research/dev-environment.md`, `docs/research/toolchain-and-boot.md`, `log.md`
 - **Test first:** the evidence for Verus, Atmosphere and `vostd`, Miri, Kani, `loom`, `build-std` (RFCs and the 2026 goal), CHERI's standardisation and QEMU; the two Corrections are measured here (log lines of 2026-11-27).
 - **Change:** spec §4.5 topics 4-6 and the two Corrections entries.
