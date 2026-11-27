@@ -26,7 +26,7 @@ Choices the spec leaves to implementation:
 
 ### Step 2: `doctor` checks 1-5 (R3, R4, R6)
 
-- [ ] **Who:** builder
+- [x] **Who:** builder
 - **Files:** `xtask/src/main.rs`, `xtask/src/doctor.rs`, `xtask/src/cmd.rs` (only if a shared helper moves there)
 - **Signatures:**
   - `pub(crate) enum Status { Ok, Warn, Skip, Fail }`
@@ -123,4 +123,4 @@ Choices the spec leaves to implementation:
 
 ## 5. Deviations
 
-None yet.
+- Step 2: the `doctor.rs` tests were written after the code (only the `parse` test ran red first); stage 5's code review is asked to check that each can fail. `doctor` reads `rust-toolchain.toml` with a hand parser until step 5 adds `toml`, and finds the root with `git rev-parse --show-toplevel`.
