@@ -60,17 +60,27 @@ pub(crate) fn run_with_deadline(
     }
 }
 
-/// The leftover tagged QEMU processes in `pgrep -f -l` output: pid and program basename.
-fn leftovers(pgrep_output: &str) -> Vec<(u32, String)> {
+/// The leftover tagged QEMU processes among the pids in `pgrep -f` output: pid and program
+/// basename. Each pid is checked on its own with `ps`, so a process whose arguments forge a line
+/// is not believed; one that has exited (`ps` fails) is skipped.
+fn leftovers(runner: &dyn Runner, pgrep_output: &str) -> Vec<(u32, String)> {
+    let ps = |field: &str, id: &str| {
+        runner
+            .capture("ps", &["-o", field, "-p", id])
+            .ok()
+            .filter(|c| c.success)
+            .map(|c| c.text)
+    };
     pgrep_output
         .lines()
-        .filter_map(|line| {
-            let (pid, command) = line.trim().split_once(' ')?;
-            let pid = pid.parse().ok()?;
-            let program = command.split_whitespace().next()?;
-            let base = program.rsplit('/').next()?;
-            (base.starts_with("qemu-system-") && command.contains("-name xtask-doctor-"))
-                .then(|| (pid, base.to_string()))
+        .filter_map(|line| line.trim().parse::<u32>().ok())
+        .filter_map(|pid| {
+            let id = pid.to_string();
+            let comm = ps("comm=", &id)?;
+            let base = comm.trim().rsplit('/').next()?.to_string();
+            let args = ps("args=", &id)?;
+            (base.starts_with("qemu-system-") && args.contains("-name xtask-doctor-"))
+                .then_some((pid, base))
         })
         .collect()
 }
@@ -83,8 +93,8 @@ fn sweep(runner: &dyn Runner) -> Vec<Line> {
 fn sweep_within(runner: &dyn Runner, wait: Duration) -> Vec<Line> {
     const ITEM: &str = "leftover";
     let warn = |detail: String| Line::new(Status::Warn, C, ITEM, detail);
-    let found = match runner.capture("pgrep", &["-f", "-l", "xtask-doctor-"]) {
-        Ok(c) if c.success => leftovers(&c.text),
+    let found = match runner.capture("pgrep", &["-f", "xtask-doctor-"]) {
+        Ok(c) if c.success => leftovers(runner, &c.text),
         Ok(c) if c.code == Some(1) => return Vec::new(),
         Ok(c) => return vec![warn(format!("`pgrep` failed: {}", c.text.trim()))],
         Err(e) => return vec![warn(e)],
@@ -100,11 +110,10 @@ fn sweep_within(runner: &dyn Runner, wait: Duration) -> Vec<Line> {
             }
             let end = Instant::now() + wait;
             loop {
-                if !runner
-                    .capture("kill", &["-0", &id])
-                    .is_ok_and(|c| c.success)
-                {
-                    return warn(format!("killed pid {pid} ({program})"));
+                match runner.capture("kill", &["-0", &id]) {
+                    Ok(c) if c.success => {}
+                    Ok(_) => return warn(format!("killed pid {pid} ({program})")),
+                    Err(e) => return warn(format!("cannot tell whether pid {pid} exited: {e}")),
                 }
                 if Instant::now() >= end {
                     return warn(format!("pid {pid} ({program}) still running"));
@@ -122,8 +131,8 @@ pub(super) struct Boot {
     /// Arguments beyond the common flags; `{fw}` is replaced by the firmware path and `{accel}` by
     /// `-cpu host -accel hvf` (macOS arm64) or `-cpu max -accel tcg`.
     pub args: &'static [&'static str],
-    /// The firmware file (from check 4) this boot needs, if any.
-    pub firmware: Option<&'static str>,
+    /// The firmware files (from check 4) this boot needs; the first is the one `{fw}` becomes.
+    pub firmware: &'static [&'static str],
     pub marker: &'static str,
     pub deadline_secs: u64,
 }
@@ -133,7 +142,7 @@ pub(super) const BOOTS: [Boot; 5] = [
         name: "x86_64-bios",
         program: "qemu-system-x86_64",
         args: &[],
-        firmware: None,
+        firmware: &[],
         marker: "SeaBIOS",
         deadline_secs: 20,
     },
@@ -146,7 +155,7 @@ pub(super) const BOOTS: [Boot; 5] = [
             "-drive",
             "if=pflash,format=raw,readonly=on,file={fw}",
         ],
-        firmware: Some("edk2-x86_64-code.fd"),
+        firmware: &["edk2-x86_64-code.fd"],
         marker: "UEFI Interactive Shell",
         deadline_secs: 60,
     },
@@ -154,7 +163,7 @@ pub(super) const BOOTS: [Boot; 5] = [
         name: "aarch64-uefi",
         program: "qemu-system-aarch64",
         args: &["-M", "virt", "{accel}", "-bios", "{fw}"],
-        firmware: Some("edk2-aarch64-code.fd"),
+        firmware: &["edk2-aarch64-code.fd"],
         marker: "UEFI firmware",
         deadline_secs: 30,
     },
@@ -162,7 +171,7 @@ pub(super) const BOOTS: [Boot; 5] = [
         name: "riscv64-opensbi",
         program: "qemu-system-riscv64",
         args: &["-M", "virt", "-bios", "default"],
-        firmware: Some("opensbi-riscv64-generic-fw_dynamic.bin"),
+        firmware: &["opensbi-riscv64-generic-fw_dynamic.bin"],
         marker: "OpenSBI v",
         deadline_secs: 20,
     },
@@ -175,7 +184,10 @@ pub(super) const BOOTS: [Boot; 5] = [
             "-drive",
             "if=pflash,unit=0,format=raw,readonly=on,file={fw}",
         ],
-        firmware: Some("edk2-riscv-code.fd"),
+        firmware: &[
+            "edk2-riscv-code.fd",
+            "opensbi-riscv64-generic-fw_dynamic.bin",
+        ],
         marker: "UEFI v",
         deadline_secs: 60,
     },
@@ -212,6 +224,10 @@ pub(super) fn wait_for_marker(
     // The unmatched tail of earlier chunks, so a marker split across chunks is found.
     let mut window: Vec<u8> = Vec::new();
     loop {
+        // `recv_timeout` returns a queued chunk before it looks at the deadline, so check it here.
+        if Instant::now() >= end {
+            return Ok(false);
+        }
         let left = end.saturating_duration_since(Instant::now());
         match rx.recv_timeout(left) {
             Ok(chunk) => {
@@ -295,13 +311,14 @@ pub(super) fn check(
         if !state.qemu_usable(boot.program) {
             return fail(format!("{} not usable, see check host-tools", boot.program));
         }
-        let firmware = match boot.firmware {
-            None => None,
-            Some(file) => match state.firmware.get(file) {
-                Some(path) => Some(path.as_path()),
+        let mut firmware = None;
+        for (i, file) in boot.firmware.iter().enumerate() {
+            match state.firmware.get(file) {
+                Some(path) if i == 0 => firmware = Some(path.as_path()),
+                Some(_) => {}
                 None => return fail(format!("{file} not found, see check firmware")),
-            },
-        };
+            }
+        }
         let root = match root {
             Ok(root) => root,
             Err(e) => return fail(format!("repository root unknown: {e}")),
@@ -435,6 +452,42 @@ mod tests {
         );
     }
 
+    /// Returns a full non-matching chunk on each of `0` calls, then ends: a guest that keeps
+    /// printing (finite, so a broken deadline ends the test instead of filling the disk).
+    struct Endless(u32);
+
+    impl Read for Endless {
+        fn read(&mut self, buf: &mut [u8]) -> std::io::Result<usize> {
+            if self.0 == 0 {
+                return Ok(0);
+            }
+            self.0 -= 1;
+            buf.fill(b'x');
+            Ok(buf.len())
+        }
+    }
+
+    #[test]
+    fn a_reader_that_never_stops_printing_returns_false_within_the_deadline_plus_a_second() {
+        let dir = temp("endless");
+        // A long marker that almost matches makes each queued chunk slow to scan, so the
+        // queue is never empty and `recv_timeout` never reports the deadline by itself.
+        let marker = format!("{}y", "x".repeat(4000));
+        let start = Instant::now();
+        let found = wait_for_marker(
+            Endless(8000),
+            &marker,
+            Duration::from_millis(100),
+            File::create(dir.join("x.log")).unwrap(),
+        );
+        assert_eq!(found, Ok(false));
+        assert!(
+            start.elapsed() < Duration::from_millis(1100),
+            "{:?}",
+            start.elapsed()
+        );
+    }
+
     #[test]
     fn a_child_guard_dropped_in_a_panic_leaves_the_child_reaped() {
         let child = std::process::Command::new("sleep")
@@ -503,7 +556,7 @@ mod tests {
 
     fn joined(name: &str, mac: bool) -> String {
         let b = row(name);
-        command(b, b.firmware.map(|_| Path::new("/fw/file.fd")), mac).join(" ")
+        command(b, b.firmware.first().map(|_| Path::new("/fw/file.fd")), mac).join(" ")
     }
 
     fn common_text(name: &str) -> String {
@@ -529,7 +582,7 @@ mod tests {
                 "qemu-system-x86_64",
                 "UEFI Interactive Shell",
                 60,
-                Some("edk2-x86_64-code.fd")
+                &["edk2-x86_64-code.fd"][..]
             )
         );
         assert_eq!(
@@ -550,7 +603,7 @@ mod tests {
                 "qemu-system-aarch64",
                 "UEFI firmware",
                 30,
-                Some("edk2-aarch64-code.fd")
+                &["edk2-aarch64-code.fd"][..]
             )
         );
         assert_eq!(
@@ -591,7 +644,10 @@ mod tests {
                 "qemu-system-riscv64",
                 "UEFI v",
                 60,
-                Some("edk2-riscv-code.fd")
+                &[
+                    "edk2-riscv-code.fd",
+                    "opensbi-riscv64-generic-fw_dynamic.bin"
+                ][..]
             )
         );
         assert_eq!(
@@ -634,10 +690,16 @@ mod tests {
         }
     }
 
-    /// Like [`Pgrep`] but records the calls, and `kill -0` can report the process still alive.
+    /// A fake keyed on program and arguments: `pgrep`, `ps -o comm= -p <pid>`,
+    /// `ps -o args= -p <pid>`, `kill -KILL` and `kill -0`; records the calls. A pid missing from
+    /// `procs` is gone (`ps` exits 1).
     struct Recording {
         pgrep: Result<Captured, String>,
+        /// `(pid, comm, args)` of each live process.
+        procs: Vec<(u32, &'static str, &'static str)>,
         alive: bool,
+        kill0_cannot_start: bool,
+        eol: &'static str,
         calls: std::cell::RefCell<Vec<String>>,
     }
 
@@ -648,7 +710,20 @@ mod tests {
                 .push(format!("{program} {}", args.join(" ")));
             match (program, args) {
                 ("pgrep", _) => self.pgrep.clone(),
+                ("ps", ["-o", field @ ("comm=" | "args="), "-p", pid]) => {
+                    let pid: u32 = pid.parse().unwrap();
+                    Ok(match self.procs.iter().find(|p| p.0 == pid) {
+                        Some(p) => {
+                            let text = if *field == "comm=" { p.1 } else { p.2 };
+                            reply(true, 0, &format!("{text}{}", self.eol))
+                        }
+                        None => reply(false, 1, ""),
+                    })
+                }
                 ("kill", ["-KILL", _]) => Ok(reply(true, 0, "")),
+                ("kill", ["-0", _]) if self.kill0_cannot_start => {
+                    Err("cannot start `kill`: boom".into())
+                }
                 ("kill", ["-0", _]) if self.alive => Ok(reply(true, 0, "")),
                 ("kill", ["-0", _]) => Ok(reply(false, 1, "No such process")),
                 _ => Err(format!("unexpected {program} {args:?}")),
@@ -656,23 +731,51 @@ mod tests {
         }
     }
 
+    const PROCS: [(u32, &str, &str); 5] = [
+        (
+            101,
+            "qemu-system-riscv64",
+            "qemu-system-riscv64 -M virt -name xtask-doctor-leftover",
+        ),
+        (
+            202,
+            "/opt/homebrew/bin/qemu-system-riscv64",
+            "/opt/homebrew/bin/qemu-system-riscv64 -nographic -name xtask-doctor-riscv64-uefi",
+        ),
+        (303, "qemu-system-x86_64", "qemu-system-x86_64 -M q35"),
+        // A forged process: its arguments carry the tag and a newline then another pid.
+        (
+            404,
+            "sh",
+            "sh -c echo\n505 qemu-system-riscv64 -name xtask-doctor-x",
+        ),
+        // Tagged, but not a QEMU binary.
+        (606, "vim", "vim -name xtask-doctor-notes"),
+    ];
+
     fn recording(pgrep: Result<Captured, String>, alive: bool) -> Recording {
         Recording {
             pgrep,
+            procs: PROCS.to_vec(),
             alive,
+            kill0_cannot_start: false,
+            eol: "\n",
             calls: std::cell::RefCell::default(),
         }
     }
 
-    const PGREP: &str = "101 qemu-system-riscv64 -M virt -name xtask-doctor-leftover\n\
-        202 /opt/homebrew/bin/qemu-system-riscv64 -nographic -name xtask-doctor-riscv64-uefi\n\
-        303 qemu-system-x86_64 -M q35\n\
-        404 zsh -c pgrep -f -l xtask-doctor-\n";
+    /// What `pgrep -f xtask-doctor-` prints for [`PROCS`], plus 505 (named by the forged line,
+    /// gone by the time `ps` runs) and 707 (gone).
+    const PGREP: &str = "101\n202\n303\n404\n505\n606\n707\n";
 
     #[test]
     fn every_boot_has_no_network_and_a_name_tag() {
         for boot in &BOOTS {
-            let args = command(boot, Some(Path::new("/fw/f.fd")), true);
+            let args = command(
+                boot,
+                boot.firmware.first().map(|_| Path::new("/fw/f.fd")),
+                true,
+            );
             let at = args.iter().position(|a| a == "-nic").expect("-nic");
             assert_eq!(args[at + 1], "none", "{}", boot.name);
             let at = args.iter().position(|a| a == "-name").expect("-name");
@@ -681,25 +784,14 @@ mod tests {
     }
 
     #[test]
-    fn leftovers_picks_only_tagged_qemu_lines_also_as_crlf() {
-        let want = vec![
-            (101, "qemu-system-riscv64".to_string()),
-            (202, "qemu-system-riscv64".to_string()),
-        ];
-        assert_eq!(leftovers(PGREP), want);
-        assert_eq!(leftovers(&PGREP.replace('\n', "\r\n")), want);
-        assert_eq!(leftovers(""), vec![]);
-    }
-
-    #[test]
     fn sweep_prints_nothing_when_pgrep_exits_1() {
         let r = recording(Ok(none()), false);
         assert_eq!(sweep(&r), vec![]);
-        assert_eq!(*r.calls.borrow(), ["pgrep -f -l xtask-doctor-"]);
+        assert_eq!(*r.calls.borrow(), ["pgrep -f xtask-doctor-"]);
     }
 
     #[test]
-    fn sweep_warns_once_when_pgrep_fails_otherwise() {
+    fn sweep_warns_once_when_pgrep_exits_2_or_cannot_start() {
         let r = recording(Ok(reply(false, 2, "pgrep: bad")), false);
         let lines = sweep(&r);
         assert_eq!(lines.len(), 1, "{lines:?}");
@@ -709,26 +801,44 @@ mod tests {
                 .to_string()
                 .starts_with("warn smoke-boot leftover:")
         );
+        assert!(!r.calls.borrow().iter().any(|c| c.starts_with("kill")));
         let cannot = recording(Err("cannot start `pgrep`".into()), false);
         assert_eq!(sweep(&cannot).len(), 1);
-        assert!(!r.calls.borrow().iter().any(|c| c.starts_with("kill")));
     }
 
     #[test]
-    fn sweep_kills_each_leftover_and_warns_for_each() {
-        let r = recording(Ok(reply(true, 0, PGREP)), false);
+    fn sweep_kills_only_tagged_qemu_processes_also_with_a_full_path_and_crlf() {
+        for eol in ["\n", "\r\n"] {
+            let mut r = recording(Ok(reply(true, 0, &PGREP.replace('\n', eol))), false);
+            r.eol = eol;
+            let text: Vec<String> = sweep(&r).iter().map(ToString::to_string).collect();
+            assert_eq!(
+                text,
+                [
+                    "warn smoke-boot leftover: killed pid 101 (qemu-system-riscv64)",
+                    "warn smoke-boot leftover: killed pid 202 (qemu-system-riscv64)",
+                ],
+                "{eol:?}"
+            );
+            let calls = r.calls.borrow();
+            let kills: Vec<&String> = calls
+                .iter()
+                .filter(|c| c.starts_with("kill -KILL"))
+                .collect();
+            assert_eq!(kills, ["kill -KILL 101", "kill -KILL 202"], "{eol:?}");
+            assert_eq!(calls[0], "pgrep -f xtask-doctor-");
+        }
+    }
+
+    #[test]
+    fn sweep_warns_when_kill_0_cannot_start_instead_of_saying_killed() {
+        let mut r = recording(Ok(reply(true, 0, "101\n")), false);
+        r.kill0_cannot_start = true;
         let lines = sweep(&r);
-        let text: Vec<String> = lines.iter().map(ToString::to_string).collect();
-        assert_eq!(
-            text,
-            [
-                "warn smoke-boot leftover: killed pid 101 (qemu-system-riscv64)",
-                "warn smoke-boot leftover: killed pid 202 (qemu-system-riscv64)",
-            ]
-        );
-        let calls = r.calls.borrow();
-        assert_eq!(calls.iter().filter(|c| *c == "kill -KILL 101").count(), 1);
-        assert_eq!(calls.iter().filter(|c| *c == "kill -KILL 202").count(), 1);
+        assert_eq!(lines.len(), 1, "{lines:?}");
+        assert_eq!(lines[0].status, Status::Warn);
+        assert!(lines[0].detail.contains("boom"), "{}", lines[0]);
+        assert!(!lines[0].detail.contains("killed"), "{}", lines[0]);
     }
 
     #[test]
@@ -801,5 +911,78 @@ mod tests {
             &Pgrep(none()),
         );
         assert!(no_root.iter().all(|l| l.status == Status::Fail));
+    }
+
+    const FW_FILES: [&str; 4] = [
+        "edk2-x86_64-code.fd",
+        "edk2-aarch64-code.fd",
+        "edk2-riscv-code.fd",
+        "opensbi-riscv64-generic-fw_dynamic.bin",
+    ];
+
+    /// Only the non-x86 QEMUs are usable, so no real QEMU can start.
+    fn non_x86_state(files: &[&'static str]) -> State {
+        State {
+            qemu_aarch64: true,
+            qemu_riscv64: true,
+            firmware: files
+                .iter()
+                .map(|f| (*f, PathBuf::from("/fw").join(f)))
+                .collect(),
+            ..State::default()
+        }
+    }
+
+    const NON_X86: [&str; 3] = ["aarch64-uefi", "riscv64-opensbi", "riscv64-uefi"];
+
+    #[test]
+    fn firmware_boots_without_firmware_fail_naming_check_firmware_and_create_nothing() {
+        let dir = temp("no-firmware");
+        let lines = check(&non_x86_state(&[]), &Ok(dir.clone()), true, &Pgrep(none()));
+        assert_eq!(lines.len(), BOOTS.len());
+        for name in NON_X86 {
+            let l = lines.iter().find(|l| l.item == name).unwrap();
+            assert_eq!(l.status, Status::Fail, "{l}");
+            assert!(l.detail.contains("check firmware"), "{l}");
+        }
+        for name in ["x86_64-bios", "x86_64-uefi"] {
+            let l = lines.iter().find(|l| l.item == name).unwrap();
+            assert!(l.detail.contains("check host-tools"), "{l}");
+        }
+        assert!(
+            !dir.join("target").exists(),
+            "a boot made its log directory"
+        );
+    }
+
+    #[test]
+    fn riscv64_uefi_needs_opensbi_too() {
+        let dir = temp("riscv-uefi-fw");
+        let state = non_x86_state(&["edk2-riscv-code.fd"]);
+        let lines = check(&state, &Ok(dir.clone()), true, &Pgrep(none()));
+        let l = lines.iter().find(|l| l.item == "riscv64-uefi").unwrap();
+        assert_eq!(l.status, Status::Fail, "{l}");
+        assert!(
+            l.detail.contains("opensbi-riscv64-generic-fw_dynamic.bin")
+                && l.detail.contains("check firmware"),
+            "{l}"
+        );
+        assert!(!dir.join("target").exists());
+    }
+
+    #[test]
+    fn with_firmware_present_an_unknown_root_fails_naming_it() {
+        let lines = check(
+            &non_x86_state(&FW_FILES),
+            &Err("no git".into()),
+            true,
+            &Pgrep(none()),
+        );
+        for name in NON_X86 {
+            let l = lines.iter().find(|l| l.item == name).unwrap();
+            assert_eq!(l.status, Status::Fail, "{l}");
+            assert!(l.detail.contains("repository root unknown"), "{l}");
+            assert!(l.detail.contains("no git"), "{l}");
+        }
     }
 }

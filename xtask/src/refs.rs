@@ -223,6 +223,8 @@ pub(crate) fn place(tmp: &Path, dest: &Path, sha256: &str) -> Result<(), String>
 /// The `curl` arguments that download `url` to `out`.
 pub(crate) fn curl_args(url: &str, out: &Path) -> Vec<String> {
     [
+        "--disable",
+        "--globoff",
         "--fail",
         "--location",
         "--proto",
@@ -346,7 +348,15 @@ fn fetch_one(
 ) -> Result<Outcome, String> {
     let mut regenerate = false;
     match status(root, doc) {
-        RefStatus::Ok | RefStatus::Unpinned(_) => return Ok(Outcome::Present),
+        RefStatus::Ok => return Ok(Outcome::Present),
+        // The file is present but unpinned: only its text can be missing.
+        RefStatus::Unpinned(_) => {
+            if doc.text(root).is_some_and(|t| !t.is_file()) {
+                regenerate = true;
+            } else {
+                return Ok(Outcome::Present);
+            }
+        }
         RefStatus::NoText => regenerate = true,
         RefStatus::Missing if doc.manual => {
             let how = doc.how.as_deref().unwrap_or("");
@@ -378,6 +388,7 @@ fn fetch_one(
         let tmp = file.with_extension(format!("{}.part", doc.format.ext()));
         writable(&files, &file)?;
         writable(&files, &tmp)?;
+        drop(std::fs::remove_file(&tmp));
         if let Err(e) = download(doc, &tmp) {
             drop(std::fs::remove_file(&tmp));
             return Err(e);
@@ -387,6 +398,7 @@ fn fetch_one(
     if let Some(text) = text {
         writable(&texts, &text)?;
         writable(&texts, &part_of(&text))?;
+        drop(std::fs::remove_file(part_of(&text)));
         if let Err(e) = convert(&file, &text) {
             drop(std::fs::remove_file(&text));
             return Err(e);
@@ -702,6 +714,8 @@ mod tests {
         ] {
             assert!(has(flag), "missing {flag} in {args:?}");
         }
+        assert_eq!(args[0], "--disable", "{args:?}");
+        assert!(has("--globoff"), "{args:?}");
         let at = |s: &str| args.iter().position(|a| a == s).unwrap();
         assert_eq!(args[at("--proto") + 1], "=https");
         assert_eq!(args[at("--proto-redir") + 1], "=https");
@@ -776,6 +790,50 @@ mod tests {
         fetch_all(&root, &docs, &fake_download(&calls, &[]), &fake_convert).unwrap();
         assert!(calls.borrow().is_empty());
         assert!(root.join("reference/text/a.txt").is_file());
+        drop(fs::remove_dir_all(&root));
+    }
+
+    #[test]
+    fn an_unpinned_manual_entry_without_text_is_converted_without_downloading() {
+        let root = tree("fetch-unpinned");
+        fs::write(root.join("reference/files/m.pdf"), "abc").unwrap();
+        let docs = [doc("m", Format::Pdf, None, true)];
+        assert!(matches!(status(&root, &docs[0]), RefStatus::Unpinned(_)));
+        let calls = RefCell::new(Vec::new());
+        fetch_all(&root, &docs, &fake_download(&calls, &[]), &fake_convert).unwrap();
+        assert!(calls.borrow().is_empty());
+        assert!(root.join("reference/text/m.txt").is_file());
+        // Still unpinned afterwards (spec section 4.4).
+        assert!(matches!(status(&root, &docs[0]), RefStatus::Unpinned(_)));
+        drop(fs::remove_dir_all(&root));
+    }
+
+    #[test]
+    fn stale_part_files_are_deleted_before_an_entry_writes() {
+        let root = tree("fetch-stale");
+        let files = root.join("reference/files");
+        let texts = root.join("reference/text");
+        fs::write(files.join("a.pdf.part"), "stale").unwrap();
+        fs::write(texts.join("a.part"), "stale").unwrap();
+        fs::write(files.join("b.pdf"), "abc").unwrap();
+        fs::write(texts.join("b.part"), "stale").unwrap();
+        let docs = [
+            doc("a", Format::Pdf, Some(SHA_A), false),
+            doc("b", Format::Pdf, Some(SHA_A), false),
+        ];
+        let download = |_: &Doc, out: &Path| -> Result<(), String> {
+            assert!(!out.exists(), "stale {} was not deleted", out.display());
+            fs::write(out, "abc").map_err(|e| e.to_string())
+        };
+        let convert = |_: &Path, dest: &Path| -> Result<(), String> {
+            let part = dest.with_extension("part");
+            assert!(!part.exists(), "stale {} was not deleted", part.display());
+            fs::write(dest, "text").map_err(|e| e.to_string())
+        };
+        fetch_all(&root, &docs, &download, &convert).unwrap();
+        assert!(!files.join("a.pdf.part").exists());
+        assert!(!texts.join("a.part").exists());
+        assert!(!texts.join("b.part").exists());
         drop(fs::remove_dir_all(&root));
     }
 

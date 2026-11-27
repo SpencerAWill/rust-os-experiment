@@ -503,29 +503,49 @@ fn read_toolchain_file(root: &Result<PathBuf, String>) -> Result<String, String>
         .map_err(|e| format!("cannot read rust-toolchain.toml: {e}"))
 }
 
+/// One named check; the name is the `check` column its lines print.
+type NamedCheck<'a> = (&'static str, Box<dyn Fn(&mut State) -> Vec<Line> + 'a>);
+
+/// Every check in the order of spec section 4.3.
+fn checks<'a>(
+    runner: &'a dyn Runner,
+    root: &'a Result<PathBuf, String>,
+    mac_arm64: bool,
+) -> Vec<NamedCheck<'a>> {
+    vec![
+        (
+            "toolchain",
+            Box::new(move |_| check_toolchain(runner, read_toolchain_file(root))),
+        ),
+        ("host-tools", Box::new(move |s| check_host_tools(runner, s))),
+        ("qemu-version", Box::new(|s| check_qemu_version(s))),
+        ("firmware", Box::new(move |s| check_firmware(runner, s))),
+        (
+            "accelerator",
+            Box::new(move |s| check_accelerator(runner, s, mac_arm64)),
+        ),
+        (
+            "smoke-boot",
+            Box::new(move |s| boot::check(s, root, mac_arm64, runner)),
+        ),
+        (
+            "reference-library",
+            Box::new(move |_| check_references(root.clone().and_then(|r| refs::statuses(&r)))),
+        ),
+    ]
+}
+
 /// Runs `cargo xtask doctor`.
 pub(crate) fn run() -> Result<(), String> {
     let runner = SystemRunner;
     let root = repository_root(&runner);
     let mac_arm64 = cfg!(all(target_os = "macos", target_arch = "aarch64"));
-    let toolchain = |_: &mut State| check_toolchain(&runner, read_toolchain_file(&root));
-    let host_tools = |s: &mut State| check_host_tools(&runner, s);
-    let qemu_version = |s: &mut State| check_qemu_version(s);
-    let firmware = |s: &mut State| check_firmware(&runner, s);
-    let smoke_boots = |s: &mut State| boot::check(s, &root, mac_arm64, &runner);
-    let accelerator = |s: &mut State| check_accelerator(&runner, s, mac_arm64);
-    let references =
-        |_: &mut State| check_references(root.clone().and_then(|r| refs::statuses(&r)));
-    let checks: [Check<'_>; 7] = [
-        &toolchain,
-        &host_tools,
-        &qemu_version,
-        &firmware,
-        &accelerator,
-        &smoke_boots,
-        &references,
-    ];
-    execute(&checks, &mut |line| println!("{line}"))
+    let list = checks(&runner, &root, mac_arm64);
+    let list: Vec<Check<'_>> = list
+        .iter()
+        .map(|(_, check)| &**check as Check<'_>)
+        .collect();
+    execute(&list, &mut |line| println!("{line}"))
 }
 
 #[cfg(test)]
@@ -760,6 +780,243 @@ mod tests {
         assert_eq!(status("llvm-tools"), Status::Fail);
         assert_eq!(status("x86_64-unknown-none"), Status::Ok);
         assert_eq!(status("aarch64-unknown-none"), Status::Fail);
+    }
+
+    #[test]
+    fn parse_version_skips_leading_digits_that_are_not_the_version() {
+        assert_eq!(parse_version("x86_64 gdb 18.1").as_deref(), Some("18.1"));
+        assert_eq!(
+            parse_version("build 7, version 1.2.3").as_deref(),
+            Some("1.2.3")
+        );
+    }
+
+    /// Replies per program with `(success, text)`; `Err` for a program not listed.
+    struct ByProgram(Vec<(&'static str, bool, &'static str)>);
+
+    impl Runner for ByProgram {
+        fn capture(&self, program: &str, _args: &[&str]) -> Result<Captured, String> {
+            self.0
+                .iter()
+                .find(|(p, ..)| *p == program)
+                .map(|&(_, success, text)| Captured {
+                    success,
+                    code: Some(i32::from(!success)),
+                    text: text.to_string(),
+                })
+                .ok_or_else(|| format!("cannot start `{program}`"))
+        }
+    }
+
+    #[test]
+    fn host_tools_record_each_qemu_in_its_own_field() {
+        let tools = |aarch64_ok: bool| {
+            ByProgram(
+                HOST_TOOLS
+                    .iter()
+                    .map(|&(t, ..)| match t {
+                        "qemu-system-x86_64" => (t, true, "QEMU emulator version 11.1.3"),
+                        "qemu-system-aarch64" => (t, aarch64_ok, "QEMU emulator version 11.1.2"),
+                        "qemu-system-riscv64" => (t, true, "QEMU emulator version 11.1.1"),
+                        _ => (t, true, "tool 1.0.0"),
+                    })
+                    .collect(),
+            )
+        };
+        let mut state = State::default();
+        check_host_tools(&tools(true), &mut state);
+        assert_eq!(state.qemu_x86.as_deref(), Some("11.1.3"));
+        assert!(state.qemu_aarch64 && state.qemu_riscv64);
+
+        let mut state = State::default();
+        let lines = check_host_tools(&tools(false), &mut state);
+        assert_eq!(state.qemu_x86.as_deref(), Some("11.1.3"));
+        assert!(!state.qemu_aarch64, "aarch64 failed");
+        assert!(state.qemu_riscv64);
+        assert_eq!(lines.iter().filter(|l| l.status == Status::Fail).count(), 1);
+    }
+
+    #[test]
+    fn firmware_found_in_a_search_directory_is_ok_with_its_path_and_the_rest_fail() {
+        let dir = std::env::temp_dir().join(format!("xtask-fw-{}", std::process::id()));
+        drop(std::fs::remove_dir_all(&dir));
+        std::fs::create_dir_all(&dir).unwrap();
+        std::fs::write(dir.join("edk2-x86_64-code.fd"), "").unwrap();
+        std::fs::write(dir.join("opensbi-riscv64-generic-fw_dynamic.bin"), "").unwrap();
+        let listing = format!("/no/such/dir\n{}\n", dir.display());
+        let runner = ByProgram(vec![(
+            "qemu-system-x86_64",
+            true,
+            Box::leak(listing.into_boxed_str()),
+        )]);
+        let mut state = State {
+            qemu_x86: Some("11.1.3".into()),
+            ..State::default()
+        };
+        let lines = check_firmware(&runner, &mut state);
+        let text: Vec<String> = lines.iter().map(ToString::to_string).collect();
+        assert_eq!(text.len(), 4, "{text:?}");
+        let p = |f: &str| dir.join(f).display().to_string();
+        assert_eq!(
+            text[0],
+            format!(
+                "ok firmware edk2-x86_64-code.fd: {}",
+                p("edk2-x86_64-code.fd")
+            )
+        );
+        assert!(
+            text[1].starts_with("FAIL firmware edk2-aarch64-code.fd:"),
+            "{text:?}"
+        );
+        assert!(text[1].contains("1 QEMU search directory"), "{text:?}");
+        assert!(
+            text[2].starts_with("FAIL firmware edk2-riscv-code.fd:"),
+            "{text:?}"
+        );
+        assert_eq!(
+            text[3],
+            format!(
+                "ok firmware opensbi-riscv64-generic-fw_dynamic.bin: {}",
+                p("opensbi-riscv64-generic-fw_dynamic.bin")
+            )
+        );
+        let found: Vec<_> = state.firmware.keys().copied().collect();
+        assert_eq!(
+            found,
+            [
+                "edk2-x86_64-code.fd",
+                "opensbi-riscv64-generic-fw_dynamic.bin"
+            ]
+        );
+        drop(std::fs::remove_dir_all(&dir));
+    }
+
+    #[test]
+    fn firmware_check_fails_every_file_when_l_help_fails() {
+        for runner in [
+            ByProgram(vec![("qemu-system-x86_64", false, "bad option")]),
+            ByProgram(vec![]),
+        ] {
+            let mut state = State {
+                qemu_x86: Some("11.1.3".into()),
+                ..State::default()
+            };
+            let lines = check_firmware(&runner, &mut state);
+            assert_eq!(lines.len(), FIRMWARE.len());
+            assert!(lines.iter().all(|l| l.status == Status::Fail), "{lines:?}");
+            assert!(state.firmware.is_empty());
+        }
+        let mut state = State {
+            qemu_x86: Some("11.1.3".into()),
+            ..State::default()
+        };
+        let failed = check_firmware(
+            &ByProgram(vec![("qemu-system-x86_64", false, "bad option")]),
+            &mut state,
+        );
+        assert!(
+            failed[0].detail.contains("`-L help` failed: bad option"),
+            "{}",
+            failed[0]
+        );
+    }
+
+    /// Replies to `rustup component list` and `rustup target list` differently, and checks the
+    /// full argument list.
+    struct Rustup {
+        component: Result<Captured, String>,
+        target: Result<Captured, String>,
+    }
+
+    impl Runner for Rustup {
+        fn capture(&self, program: &str, args: &[&str]) -> Result<Captured, String> {
+            assert_eq!(program, "rustup");
+            assert_eq!(
+                &args[1..],
+                ["list", "--installed", "--toolchain", "1.100.0"]
+            );
+            match args[0] {
+                "component" => self.component.clone(),
+                "target" => self.target.clone(),
+                other => panic!("unexpected rustup {other}"),
+            }
+        }
+    }
+
+    const SMALL_TOOLCHAIN: &str = "[toolchain]\nchannel = \"1.100.0\"\ncomponents = [\"rust-src\"]\ntargets = [\"x86_64-unknown-none\"]\n";
+
+    #[test]
+    fn toolchain_reads_components_and_targets_from_their_own_listings() {
+        let components = ok("rust-src\nrust-std-x86_64-unknown-none\n");
+        let both = Rustup {
+            component: Ok(components.clone()),
+            target: Ok(ok("x86_64-unknown-none\n")),
+        };
+        let lines = check_toolchain(&both, Ok(SMALL_TOOLCHAIN.to_string()));
+        assert_eq!(lines.len(), 2);
+        assert!(lines.iter().all(|l| l.status == Status::Ok), "{lines:?}");
+        assert_eq!(lines[0].item, "rust-src");
+        // The component listing names the target's rust-std, but the target listing is empty.
+        let no_target = Rustup {
+            component: Ok(components),
+            target: Ok(ok("")),
+        };
+        let lines = check_toolchain(&no_target, Ok(SMALL_TOOLCHAIN.to_string()));
+        assert_eq!(lines[0].status, Status::Ok);
+        assert_eq!(lines[1].item, "x86_64-unknown-none");
+        assert_eq!(lines[1].status, Status::Fail);
+    }
+
+    #[test]
+    fn toolchain_fails_every_item_when_rustup_fails() {
+        let failed = Captured {
+            success: false,
+            code: Some(1),
+            text: "rustup: broken\n".into(),
+        };
+        for r in [Ok(failed), Err("cannot start `rustup`".to_string())] {
+            let runner = Rustup {
+                component: r.clone(),
+                target: r,
+            };
+            let lines = check_toolchain(&runner, Ok(SMALL_TOOLCHAIN.to_string()));
+            assert_eq!(lines.len(), 2);
+            assert!(lines.iter().all(|l| l.status == Status::Fail), "{lines:?}");
+            assert!(
+                lines.iter().all(|l| l.detail.contains("rustup")),
+                "{lines:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn toolchain_without_a_channel_is_one_fail_and_runs_nothing() {
+        let lines = check_toolchain(
+            &Panics,
+            Ok("[toolchain]\ncomponents = [\"rustfmt\"]\n".into()),
+        );
+        assert_eq!(lines.len(), 1);
+        assert_eq!(lines[0].status, Status::Fail);
+        assert!(lines[0].detail.contains("no `channel`"), "{}", lines[0]);
+    }
+
+    #[test]
+    fn the_checks_run_in_the_order_of_spec_section_4_3() {
+        let root = Err("unused".to_string());
+        let list = checks(&SystemRunner, &root, true);
+        let names: Vec<&str> = list.iter().map(|(name, _)| *name).collect();
+        assert_eq!(
+            names,
+            [
+                "toolchain",
+                "host-tools",
+                "qemu-version",
+                "firmware",
+                "accelerator",
+                "smoke-boot",
+                "reference-library",
+            ]
+        );
     }
 
     fn references(statuses: &[RefStatus]) -> Vec<Line> {
