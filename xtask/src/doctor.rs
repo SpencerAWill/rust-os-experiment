@@ -4,9 +4,12 @@
 //! code is non-zero exactly when some line is `FAIL`. External commands go through [`Runner`]
 //! so each check is unit-tested with canned output.
 
+use std::collections::BTreeMap;
 use std::fmt;
 use std::path::{Path, PathBuf};
 use std::process::Command;
+
+mod boot;
 
 /// The outcome of one item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -98,6 +101,22 @@ pub(crate) struct State {
     qemu_x86: Option<String>,
     /// Whether check 2 found `qemu-system-aarch64` usable.
     qemu_aarch64: bool,
+    /// Whether check 2 found `qemu-system-riscv64` usable.
+    qemu_riscv64: bool,
+    /// The firmware files check 4 found, by file name, with their full paths.
+    firmware: BTreeMap<&'static str, PathBuf>,
+}
+
+impl State {
+    /// Whether check 2 found the QEMU binary `program` usable.
+    fn qemu_usable(&self, program: &str) -> bool {
+        match program {
+            "qemu-system-x86_64" => self.qemu_x86.is_some(),
+            "qemu-system-aarch64" => self.qemu_aarch64,
+            "qemu-system-riscv64" => self.qemu_riscv64,
+            _ => false,
+        }
+    }
 }
 
 /// The leftmost version in `text`: `[0-9]+(\.[0-9]+)+`, or an eight-digit date.
@@ -302,6 +321,7 @@ fn check_host_tools(runner: &dyn Runner, state: &mut State) -> Vec<Line> {
                     match tool {
                         "qemu-system-x86_64" => state.qemu_x86 = Some(v.clone()),
                         "qemu-system-aarch64" => state.qemu_aarch64 = true,
+                        "qemu-system-riscv64" => state.qemu_riscv64 = true,
                         _ => {}
                     }
                     Line::new(Status::Ok, C, tool, v)
@@ -337,7 +357,7 @@ fn check_qemu_version(state: &State) -> Vec<Line> {
 }
 
 /// Check 4: the firmware files exist in a directory QEMU searches.
-fn check_firmware(runner: &dyn Runner, state: &State) -> Vec<Line> {
+fn check_firmware(runner: &dyn Runner, state: &mut State) -> Vec<Line> {
     const C: &str = "firmware";
     let fail_all = |why: &str| -> Vec<Line> {
         FIRMWARE
@@ -356,7 +376,10 @@ fn check_firmware(runner: &dyn Runner, state: &State) -> Vec<Line> {
     FIRMWARE
         .iter()
         .map(|f| match dirs.iter().find(|d| d.join(f).is_file()) {
-            Some(d) => Line::new(Status::Ok, C, f, d.join(f).display().to_string()),
+            Some(d) => {
+                state.firmware.insert(f, d.join(f));
+                Line::new(Status::Ok, C, f, d.join(f).display().to_string())
+            }
             None => Line::new(
                 Status::Fail,
                 C,
@@ -460,14 +483,16 @@ pub(crate) fn run() -> Result<(), String> {
     let host_tools = |s: &mut State| check_host_tools(&runner, s);
     let qemu_version = |s: &mut State| check_qemu_version(s);
     let firmware = |s: &mut State| check_firmware(&runner, s);
+    let smoke_boots = |s: &mut State| boot::check(s, &root, mac_arm64);
     let accelerator = |s: &mut State| check_accelerator(&runner, s, mac_arm64);
-    // Slot for check 6 (smoke boots, step 3) and check 7 (reference library, step 5).
-    let checks: [Check<'_>; 5] = [
+    // Slot for check 7 (reference library, step 5) follows the smoke boots.
+    let checks: [Check<'_>; 6] = [
         &toolchain,
         &host_tools,
         &qemu_version,
         &firmware,
         &accelerator,
+        &smoke_boots,
     ];
     execute(&checks, &mut |line| println!("{line}"))
 }
@@ -626,13 +651,13 @@ mod tests {
 
     #[test]
     fn checks_whose_prerequisite_failed_fail_without_running_anything() {
-        let state = State::default();
+        let mut state = State::default();
         let version = check_qemu_version(&state);
         assert_eq!(version.len(), 1);
         assert_eq!(version[0].status, Status::Fail);
         assert!(version[0].detail.contains("host-tools"));
 
-        let firmware = check_firmware(&Panics, &state);
+        let firmware = check_firmware(&Panics, &mut state);
         assert_eq!(firmware.len(), FIRMWARE.len());
         assert!(firmware.iter().all(|l| l.status == Status::Fail));
         assert!(firmware.iter().all(|l| l.detail.contains("host-tools")));

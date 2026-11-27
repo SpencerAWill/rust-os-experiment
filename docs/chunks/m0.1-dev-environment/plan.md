@@ -42,7 +42,7 @@ Choices the spec leaves to implementation:
 
 ### Step 3: `doctor` smoke boots (R5)
 
-- [ ] **Who:** builder
+- [x] **Who:** builder
 - **Files:** `xtask/src/doctor.rs`, `xtask/src/doctor/boot.rs`
 - **Signatures:** `struct ChildGuard(Child)` whose `Drop` kills and waits; `fn wait_for_marker(reader: impl Read + Send + 'static, marker: &str, deadline: Duration, log: File) -> Result<bool, String>` (a reader thread sending chunks over a channel, `recv_timeout` against the remaining time, every chunk written to `log`, the marker searched across chunk boundaries); `const BOOTS: [Boot; 5]` holding spec §4.3's table.
 - **Test first:** marker found in a `Cursor` (true) and the log holds the bytes; marker split across two chunks is found; a reader that never yields (the read end of `std::io::pipe()` with the writer kept open) returns false within deadline plus 1 s; EOF before the marker returns false; a `ChildGuard` around `sleep 30` dropped inside a `catch_unwind` panic leaves the child reaped (its pid no longer running, checked with `kill -0`).
@@ -124,3 +124,4 @@ Choices the spec leaves to implementation:
 ## 5. Deviations
 
 - Step 2: the `doctor.rs` tests were written after the code (only the `parse` test ran red first); stage 5's code review is asked to check that each can fail. `doctor` reads `rust-toolchain.toml` with a hand parser until step 5 adds `toml`, and finds the root with `git rev-parse --show-toplevel`.
+- Step 3: `riscv64-opensbi` runs with `-bios default` but still requires check 4 to have found `opensbi-riscv64-generic-fw_dynamic.bin` (the file `default` loads); the spec does not say.
