@@ -211,8 +211,8 @@ An entry that cannot be fetched by a stable direct URL (a click-through licence,
 
 ## 9. Done when
 
-- [ ] R1-R16 hold, with the evidence of §8: R2-R16 met (review-spec at `463cede`, review-sources for R12, final run on `9e2a486` in [log.md](log.md)); R1's CI result and the CI time pair are pending PR #11's run.
-- [ ] `cargo xtask ci` passes locally and in CI: locally on `9e2a486` and after (log.md); in CI pending PR #11's run.
+- [x] R1-R16 hold, with the evidence of §8: R2-R16 met (review-spec at `463cede`, review-sources for R12, final run on `9e2a486` in [log.md](log.md)); R1 by CI run 46063518573 on `5a2760d`, green, with the time pair in log.md.
+- [x] `cargo xtask ci` passes locally and in CI: locally on `9e2a486` and after (log.md); in CI, run 46063518573 on `5a2760d`.
 - [x] The pull request lists the reviews of [CONTRIBUTING.md](../../../CONTRIBUTING.md#reviews-before-a-pull-request): code, security (network fetch, new dependencies), docs, spec, sources (the note), and conditional for architecture portability.
 
 ## 10. Open questions
