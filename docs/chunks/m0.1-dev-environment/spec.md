@@ -1,6 +1,6 @@
 # M0.1: Development environment
 
-- **Status:** Draft (2026-11-27).
+- **Status:** Accepted (2026-11-27).
 - **Kind:** build · **Milestone:** M0 (repository foundations) · **Depends on:** M0.0 · **Decides:** no ADR · **Followed by:** M1.1
 - **Issue:** none
 - **Estimated size:** about 900 changed lines, excluding tests, lockfiles and generated files (xtask about 550, the research note about 200, documents about 150)
