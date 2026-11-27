@@ -1,0 +1,2 @@
+# The reference library: one [[doc]] table per document. See README.md.
+# Fields: id, title, version, url, sha256, format, licence; optional manual = true with how.

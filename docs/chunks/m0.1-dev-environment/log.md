@@ -28,3 +28,4 @@
 - 2026-11-27 surprise Smoke boots on this Mac took 0.0 s (SeaBIOS, aarch64, OpenSBI), 1.1 s (x86 UEFI) and 6.0 s (riscv64 UEFI); `pgrep -fl qemu-system` printed nothing after `doctor`. Uncommitted code, not yet a commit to cite (specs-4).
 - 2026-11-27 lesson? `std::io::pipe()` (stable) gives one reader for a child's merged stdout and stderr: pass `writer.try_clone()` and `writer` to the two stdio slots and drop the `Command`, or the reader never sees EOF.
 - 2026-11-27 done Step 3 (builder dispatched by name): main session re-ran `cargo xtask ci --quick` (139 tests pass) and `cargo xtask doctor` (five `ok smoke-boot` lines, exit 0); `pgrep -fl qemu-system` printed nothing (exit 1); `target/doctor/` has the five logs.
+- 2026-11-27 done Step 4: `git check-ignore reference/files/x reference/text/x` printed nothing on the previous commit (no `reference/` rule in `.gitignore`) and prints both paths now; `cargo xtask check-docs` reports 0 problems.

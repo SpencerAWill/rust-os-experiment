@@ -52,7 +52,7 @@ Choices the spec leaves to implementation:
 
 ### Step 4: the reference folder (R10)
 
-- [ ] **Who:** main session
+- [x] **Who:** main session
 - **Files:** `reference/README.md`, `reference/manifest.toml` (a header comment and no entries), `.gitignore`
 - **Test first:** `git check-ignore reference/files/x reference/text/x` prints nothing (exit 1).
 - **Change:** the README in the shape of docs/README.md Conventions (status, When this applies, Contents naming `manifest.toml`, `files/` and `text/`), the manifest fields (spec §4.4), the licence statement, and "Citing a specification" (search `reference/text/`, cite id, version and section; fall back to the web, then "unverified"). Ignore `reference/files/` and `reference/text/`.
