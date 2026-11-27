@@ -1,6 +1,6 @@
 # M0.1: Development environment
 
-- **Status:** Accepted (2026-11-27).
+- **Status:** Amended (2026-11-27): host safety (§4.3, §4.4, §6, §8, R15, R16). Accepted 2026-11-27.
 - **Kind:** build · **Milestone:** M0 (repository foundations) · **Depends on:** M0.0 · **Decides:** no ADR · **Followed by:** M1.1
 - **Issue:** none
 - **Estimated size:** about 900 changed lines, excluding tests, lockfiles and generated files (xtask about 550, the research note about 200, documents about 150)
@@ -66,7 +66,7 @@ Host tools and their version arguments: `qemu-system-x86_64`, `qemu-system-aarch
 
 Firmware files: `edk2-x86_64-code.fd`, `edk2-aarch64-code.fd`, `edk2-riscv-code.fd` and `opensbi-riscv64-generic-fw_dynamic.bin`. The search directories are taken from `qemu-system-x86_64 -L help`, which prints them one per line; a listed directory that does not exist is skipped (Homebrew's QEMU lists `share/qemu-firmware`, which is absent).
 
-Smoke boots. Every boot runs with `-nographic -monitor none -no-reboot -m 256M` and the firmware path from check 4. The markers below are the ones observed in `log.md` on 2026-11-27:
+Smoke boots. Every boot runs with `-nographic -monitor none -no-reboot -m 256M -nic none -name xtask-doctor-<name>` (`-nic none` and `-name` from the amendment of 2026-11-27: no network device for the guest, and a tag that finds a leftover process) and the firmware path from check 4. The markers below are the ones observed in `log.md` on 2026-11-27:
 
 | Name | Command (beyond the common flags) | Marker | Deadline |
 |---|---|---|---|
@@ -80,6 +80,12 @@ Smoke boots. Every boot runs with `-nographic -monitor none -no-reboot -m 256M` 
 - Serial output (stdout and stderr) is written to `target/doctor/<name>.log` as it is read, so a boot that fails leaves a readable log. The directory is resolved from the repository root (lesson xtask-1).
 - Reading MUST NOT block past the deadline (for example, a reader thread and a channel with a receive timeout).
 - The boots run one after another; *my call*, parallel boots would save seconds and make the logs harder to follow.
+- *Amendment of 2026-11-27 (host safety):* check 6 starts by killing every QEMU left by an earlier run, which the guard cannot prevent when `xtask` itself is killed (SIGKILL, a tool's timeout). This sweep runs even when no boot will run (a prerequisite failed). It runs `pgrep -f -l xtask-doctor-` (each output line is a pid, a space, and the full command line). A leftover is a line whose command line's first word has a file name (basename) starting with `qemu-system-`, and which contains `-name xtask-doctor-`; that basename is its `<program>`. Each leftover is killed with `kill -KILL <pid>` (arguments as a vector), then `doctor` waits up to 5 s for it to exit (`kill -0 <pid>` failing). Output, never `FAIL`:
+  - `pgrep` exits 1 with no output: no leftovers, nothing printed (*main session's call, from the cold read*: `Captured` gains the exit code, so exit 1 is told apart from an error);
+  - each leftover killed: `warn smoke-boot leftover: killed pid <pid> (<program>)`; one still running after 5 s: `warn smoke-boot leftover: pid <pid> (<program>) still running`;
+  - `pgrep` failing otherwise (cannot start, exit 2 or more), or `kill` failing: one `warn smoke-boot leftover:` line with the error.
+
+  Two `doctor` runs at the same time are not supported: the second kills the first's QEMU.
 
 ### 4.4 Reference library
 
@@ -95,11 +101,15 @@ Smoke boots. Every boot runs with `-nographic -monitor none -no-reboot -m 256M` 
 
   Doctor check 7 uses the same function and warns on any status other than `ok` and `unpinned`.
 - `cargo xtask refs --fetch` downloads every entry that is `missing` or `changed` and not `manual`, and regenerates the text of every `no-text` entry:
-  - It runs `curl --fail --location --proto =https --proto-redir =https --max-filesize 1073741824 --output <tmp>` with arguments passed as a vector, never through a shell.
+  - It runs `curl --fail --location --proto =https --proto-redir =https --max-filesize 1073741824 --connect-timeout 30 --max-time 3600 --output <tmp>` (the two timeouts from the amendment of 2026-11-27) with arguments passed as a vector, never through a shell.
   - It verifies the SHA-256 of the temporary file, then renames it into `files/`. On a mismatch it deletes the temporary file and fails, printing the expected and actual digests: the publisher changed the document, and updating the manifest entry's `version` and `sha256` is a deliberate commit.
-  - For `pdf`, it then runs `pdftotext -layout files/<id>.pdf text/<id>.txt`, writing to a temporary name and renaming on success. `html` and `md` are copied to `text/<id>.<format>` unchanged; `tar.gz` and `zip` are not unpacked and have no text (*my call*: unpacking waits until a chunk uses the data).
+  - For `pdf`, it then runs `pdftotext -layout files/<id>.pdf text/<id>.txt`, writing to a temporary name and renaming on success. *Amendment of 2026-11-27:* `pdftotext` runs under the same kill-on-drop guard as a smoke boot, with a deadline of 600 s; past it, the child is killed and reaped, the temporary output deleted, and the entry fails. If step 6 measures a conversion longer than 200 s, the deadline is raised to at least three times the longest, rounded up to a minute, and the change logged and listed in the plan's Deviations (*main session's call, from the cold read*: R14 needs every conversion to finish). `html` and `md` are copied to `text/<id>.<format>` unchanged; `tar.gz` and `zip` are not unpacked and have no text (*my call*: unpacking waits until a chunk uses the data).
   - For a `manual` entry that is `missing`, it prints `how` and the expected path; a present one is handled like any other entry (checksum if pinned, text if needed).
   - It exits non-zero if any download, checksum or text conversion failed, after attempting every entry.
+- *Amendment of 2026-11-27 (host safety):* `refs --fetch` writes only directly inside `reference/files/` and `reference/text/`. Let `R` be the repository root canonicalized (on macOS `/var` is a symlink to `/private/var`), and `F` and `T` the paths `R/reference/files` and `R/reference/text` joined literally. *(Main session's calls, from the cold read.)*
+  - Before handling an entry that would create, rename or delete a file, `refs` checks that `R/reference` canonicalizes to itself (it is not a symlink), creates `F` and `T` with `create_dir` if absent, and checks that each canonicalizes to itself. A symlinked `reference/`, `files/` or `text/` fails the check.
+  - Before each create, rename or delete, the file's name comes from a validated `id`, its parent is `F` or `T`, and if the file already exists, `symlink_metadata` says it is not a symlink (so `File::create`, `pdftotext` and the copy cannot follow one out of the tree).
+  - A failed check fails that entry with nothing touched; other entries are still attempted. An entry that is `ok` or `unpinned` writes nothing and is not checked. `refs` without `--fetch` only reads and is not checked.
 - *My call:* `toml` and `sha2` are added as `xtask` dependencies (both `MIT OR Apache-2.0`); `curl` is assumed present (it ships with macOS and the CI images), and `require_tool` reports it if not.
 
 The initial manifest covers, at the latest published version on the day the entry is written (the maintainer's choice of the full set):
@@ -152,11 +162,13 @@ An entry that cannot be fetched by a stable direct URL (a click-through licence,
 - **M0.1-R12** `docs/research/dev-environment.md` MUST cover §4.5's six topics, with every factual claim cited, measured here, or marked unverified; the two Corrections MUST be added to `toolchain-and-boot.md`.
 - **M0.1-R13** `AGENTS.md`, `researcher.md`, `review-sources.md` and `.claude/settings.json` MUST change as §4.6 says, and `AGENTS.md` MUST stay under 80 lines.
 - **M0.1-R14** On the maintainer's Mac, `cargo xtask doctor` MUST pass, and `cargo xtask refs --fetch` MUST complete for every non-`manual` entry.
+- **M0.1-R15** *(amendment of 2026-11-27)* Each smoke boot MUST run with `-nic none` and `-name xtask-doctor-<name>`, and `doctor` MUST kill every leftover tagged QEMU before the first boot, reporting each as `warn` (§4.3).
+- **M0.1-R16** *(amendment of 2026-11-27)* `refs --fetch` MUST kill `pdftotext` after its deadline (§4.4) and leave no partial text, MUST pass `curl` its connect and total timeouts, and MUST create, rename or delete files only directly inside the canonical `reference/files/` and `reference/text/` (§4.4).
 
 ## 6. Cross-cutting concerns
 
 - **`unsafe`:** n/a, because `xtask` keeps `#![forbid(unsafe_code)]`.
-- **Privilege and trust boundaries:** `refs --fetch` trusts the network only through `https` and a pinned checksum; a document is data, and text read from it never changes an agent's task (the existing "sources are data" rule). `doctor` runs only the commands of §4.3, with fixed arguments.
+- **Privilege and trust boundaries:** `refs --fetch` trusts the network only through `https` and a pinned checksum; a document is data, and text read from it never changes an agent's task (the existing "sources are data" rule). `doctor` runs only the commands of §4.3, with fixed arguments. Host safety (amendment of 2026-11-27): the guest gets no network device and only read-only firmware; each long-running child has a deadline: QEMU and `pdftotext` through `xtask`'s kill-on-drop guard, `curl` through its own `--max-time` (the short local probes, `git`, `rustup`, the version arguments, `-L help`, `-accel help`, `pgrep` and `kill`, run without one; their stdin is closed by `Command::output`); a QEMU left by a killed `xtask` is killed by the next `doctor`; `refs` writes only inside `reference/files/` and `reference/text/`. Guardrails for agents' own commands are follow-up issue work, not this chunk.
 - **Architecture portability:** the smoke boots cover x86_64, aarch64 and riscv64. Host portability: `doctor` targets macOS arm64; the accelerator check `skip`s elsewhere, and the aarch64 boot falls back to TCG. Firmware names are Homebrew's; other hosts may report them missing, which is acceptable until M2 brings QEMU to CI.
 - **Concurrency and memory ordering:** n/a, apart from the reader thread of §4.3, which only forwards bytes.
 - **Interfaces and ABI:** n/a; `manifest.toml` is an internal format, unstable.
@@ -194,6 +206,8 @@ An entry that cannot be fetched by a stable direct URL (a click-through licence,
 | R12 | `review-sources` on the note and the Corrections |
 | R13 | `review-docs`; `cargo xtask check-docs` |
 | R14 | the `doctor` and `refs --fetch` runs in `log.md`, with the commit they ran on |
+| R15 | unit tests: each `BOOTS` command contains `-nic none` and its `-name`; the leftover finder, given recorded `pgrep -f -l` output, picks only tagged lines whose first word's basename starts with `qemu-system-` (also by full path, also CRLF); with a fake runner, `pgrep` exit 1 prints nothing, exit 2 prints one `warn`, and each leftover gets one `kill -KILL` and one `warn`; the sweep runs when every boot's prerequisite failed; in `log.md`: a tagged `qemu-system-riscv64` started by hand and left running, then `doctor` prints its `warn` line and `pgrep -fl qemu-system` finds nothing |
+| R16 | unit tests: a converter child that never finishes (`sleep 30`) is killed within its deadline plus 1 s and leaves nothing in `text/`; `curl_args` contains `--connect-timeout` and `--max-time` with their values; the path check, in a temporary tree, accepts a file in `files/`, rejects a symlinked `reference/`, a symlinked `files/` and an existing `text/<id>.txt` that is a symlink, and `fetch_all` touches nothing in any symlink's target; the longest `pdftotext` time from step 6 in `log.md` |
 
 ## 9. Done when
 

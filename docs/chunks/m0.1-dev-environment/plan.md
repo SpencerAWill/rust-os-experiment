@@ -69,6 +69,16 @@ Choices the spec leaves to implementation:
 - **Verify:** `cargo xtask ci` passes (deny included); `cargo xtask refs` with the empty manifest prints nothing and exits 0; `cargo xtask doctor` passes.
 - **Commit:** `feat(xtask): add refs, the reference library manifest and fetch (M0.1)`
 
+### Step 5b: host safety, the amendment of 2026-11-27 (R15, R16)
+
+- [ ] **Who:** builder
+- **Files:** `xtask/src/doctor.rs`, `xtask/src/doctor/boot.rs`, `xtask/src/refs.rs`, `log.md`
+- **Signatures:** `Captured` gains `pub code: Option<i32>`; `fn leftovers(pgrep_output: &str) -> Vec<(u32, String)>` (pid and program basename of each leftover line); `fn sweep(runner: &dyn Runner) -> Vec<Line>`; `ChildGuard` and a deadline wait shared by the boots and `pdftotext` (`fn run_with_deadline(cmd: Command, deadline: Duration) -> Result<ExitStatus, String>` or similar, in a module both reach); `fn check_dirs(root: &Path) -> Result<(PathBuf, PathBuf), String>` (canonical root, `reference/` not a symlink, `create_dir` of `files/` and `text/`, each canonicalizes to itself) and `fn writable(dir: &Path, path: &Path) -> Result<(), String>` (parent is `dir`, not an existing symlink).
+- **Test first** (one per §8 row of R15 and R16, lesson specs-3): every `BOOTS` command contains `-nic none` and `-name xtask-doctor-<name>`; `leftovers` on `pgrep -f -l` output with a tagged `qemu-system-riscv64` line, the same by full path `/opt/homebrew/bin/qemu-system-riscv64`, an untagged `qemu-system-x86_64` line, and a `zsh -c` line containing `xtask-doctor-`, also as CRLF, returns only the two tagged QEMU lines; `sweep` with a fake runner prints nothing for `pgrep` exit 1, one `warn` for exit 2, and for two leftovers two `kill -KILL` calls and two `warn` lines; check 6 runs the sweep when every boot's prerequisite failed; `run_with_deadline` on `sleep 30` with a 1 s deadline errs within 2 s and the pid is gone (`kill -0`); a conversion past its deadline leaves nothing in `text/`; `curl_args` contains `--connect-timeout`, `30`, `--max-time`, `3600`; in a temporary tree `check_dirs` rejects a symlinked `reference/` and a symlinked `files/`, `writable` rejects an existing symlinked `text/<id>.txt` and a path in another directory, and `fetch_all` over each leaves the symlink's target unchanged; an `ok` entry is not checked.
+- **Change:** spec §4.3 and §4.4, the passages marked "amendment of 2026-11-27".
+- **Verify:** `cargo xtask ci` passes; start `qemu-system-riscv64 -M virt -nographic -bios default -name xtask-doctor-leftover` in the background, then `cargo xtask doctor` prints `warn smoke-boot leftover: killed pid <pid> (qemu-system-riscv64)` and the five boots `ok`, and `pgrep -fl qemu-system` prints nothing afterwards (logged, lesson specs-1).
+- **Commit:** `feat(xtask): bound doctor and refs child processes and paths (M0.1)`
+
 ### Step 6: the manifest's entries (R11, R14 in part)
 
 - [ ] **Who:** builder
