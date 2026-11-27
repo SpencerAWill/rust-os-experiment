@@ -11,6 +11,8 @@ use std::process::Command;
 
 mod boot;
 
+pub(crate) use boot::run_with_deadline;
+
 use crate::refs::{self, RefStatus};
 
 /// The outcome of one item.
@@ -67,6 +69,8 @@ impl fmt::Display for Line {
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(crate) struct Captured {
     pub success: bool,
+    /// The exit code; `None` when a signal ended the process.
+    pub code: Option<i32>,
     pub text: String,
 }
 
@@ -90,6 +94,7 @@ impl Runner for SystemRunner {
         text.push_str(&String::from_utf8_lossy(&out.stderr));
         Ok(Captured {
             success: out.status.success(),
+            code: out.status.code(),
             text,
         })
     }
@@ -507,7 +512,7 @@ pub(crate) fn run() -> Result<(), String> {
     let host_tools = |s: &mut State| check_host_tools(&runner, s);
     let qemu_version = |s: &mut State| check_qemu_version(s);
     let firmware = |s: &mut State| check_firmware(&runner, s);
-    let smoke_boots = |s: &mut State| boot::check(s, &root, mac_arm64);
+    let smoke_boots = |s: &mut State| boot::check(s, &root, mac_arm64, &runner);
     let accelerator = |s: &mut State| check_accelerator(&runner, s, mac_arm64);
     let references =
         |_: &mut State| check_references(root.clone().and_then(|r| refs::statuses(&r)));
@@ -577,6 +582,7 @@ mod tests {
     fn ok(text: &str) -> Captured {
         Captured {
             success: true,
+            code: Some(0),
             text: text.to_string(),
         }
     }
@@ -616,6 +622,7 @@ mod tests {
             .collect();
         tools[4].1 = Ok(Captured {
             success: false,
+            code: Some(1),
             ..ok("version 1.2.3")
         });
         let lines = check_host_tools(&Fake(tools), &mut State::default());

@@ -6,9 +6,12 @@
 use std::collections::BTreeSet;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
+use std::time::Duration;
 
 use serde::Deserialize;
 use sha2::{Digest, Sha256};
+
+use crate::doctor::run_with_deadline;
 
 /// The file format of a document, also its extension in `files/`.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
@@ -62,6 +65,15 @@ struct Manifest {
 
 /// Largest download `curl` accepts, in bytes.
 const MAX_FILESIZE: &str = "1073741824";
+
+/// `curl --connect-timeout`, in seconds.
+const CONNECT_TIMEOUT: &str = "30";
+
+/// `curl --max-time`, in seconds: the whole transfer.
+const MAX_TIME: &str = "3600";
+
+/// How long `pdftotext` may run for one document.
+const CONVERT_DEADLINE: Duration = Duration::from_secs(600);
 
 impl Format {
     /// The extension of the file in `files/`.
@@ -219,6 +231,10 @@ pub(crate) fn curl_args(url: &str, out: &Path) -> Vec<String> {
         "=https",
         "--max-filesize",
         MAX_FILESIZE,
+        "--connect-timeout",
+        CONNECT_TIMEOUT,
+        "--max-time",
+        MAX_TIME,
         "--output",
     ]
     .iter()
@@ -227,47 +243,136 @@ pub(crate) fn curl_args(url: &str, out: &Path) -> Vec<String> {
     .collect()
 }
 
-/// Handles one entry for [`fetch_all`].
+/// Checks that `R/reference`, `R/reference/files` and `R/reference/text` are real directories
+/// (not symlinks), creating the last two if absent; returns `(files, text)` under the canonical
+/// root (spec section 4.4, amendment of 2026-11-27).
+pub(crate) fn check_dirs(root: &Path) -> Result<(PathBuf, PathBuf), String> {
+    let root = std::fs::canonicalize(root)
+        .map_err(|e| format!("cannot resolve {}: {e}", root.display()))?;
+    let is_itself = |dir: &Path| {
+        std::fs::canonicalize(dir)
+            .map_err(|e| format!("cannot resolve {}: {e}", dir.display()))
+            .and_then(|c| {
+                (c == dir).then_some(()).ok_or_else(|| {
+                    format!(
+                        "{} is not a real directory (it resolves to {})",
+                        dir.display(),
+                        c.display()
+                    )
+                })
+            })
+    };
+    let reference = root.join("reference");
+    is_itself(&reference)?;
+    let files = reference.join("files");
+    let text = reference.join("text");
+    for dir in [&files, &text] {
+        match std::fs::create_dir(dir) {
+            Ok(()) => {}
+            Err(e) if e.kind() == std::io::ErrorKind::AlreadyExists => {}
+            Err(e) => return Err(format!("cannot create {}: {e}", dir.display())),
+        }
+        is_itself(dir)?;
+    }
+    Ok((files, text))
+}
+
+/// Checks that `path` is directly inside `dir` and, if it exists, is not a symlink.
+pub(crate) fn writable(dir: &Path, path: &Path) -> Result<(), String> {
+    if path.parent() != Some(dir) || path.file_name().is_none() {
+        return Err(format!(
+            "{} is not directly inside {}",
+            path.display(),
+            dir.display()
+        ));
+    }
+    match std::fs::symlink_metadata(path) {
+        Ok(m) if m.file_type().is_symlink() => Err(format!(
+            "{} is a symlink; refusing to write through it",
+            path.display()
+        )),
+        Ok(_) => Ok(()),
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => Ok(()),
+        Err(e) => Err(format!("cannot inspect {}: {e}", path.display())),
+    }
+}
+
+/// The temporary name `dest` is written under before the rename.
+fn part_of(dest: &Path) -> PathBuf {
+    dest.with_extension("part")
+}
+
+/// Converts a PDF with `program leading_args src tmp` under `deadline`, then renames the
+/// temporary text to `dest`; on any failure the temporary file is deleted.
+fn pdf_to_text(
+    program: &str,
+    leading_args: &[&str],
+    src: &Path,
+    dest: &Path,
+    deadline: Duration,
+) -> Result<(), String> {
+    let tmp = part_of(dest);
+    let mut cmd = std::process::Command::new(program);
+    cmd.args(leading_args).arg(src).arg(&tmp);
+    run_with_deadline(cmd, deadline)
+        .and_then(|s| {
+            s.success()
+                .then_some(())
+                .ok_or_else(|| format!("`{program}` failed ({s}) for {}", src.display()))
+        })
+        .and_then(|()| std::fs::rename(&tmp, dest).map_err(|e| format!("{}: {e}", dest.display())))
+        .inspect_err(|_| drop(std::fs::remove_file(&tmp)))
+}
+
+/// Handles one entry for [`fetch_all`]. An entry that would write is first checked by
+/// [`check_dirs`] and [`writable`]; the writes use the canonical directories it returns.
 fn fetch_one(
     root: &Path,
     doc: &Doc,
     download: &dyn Fn(&Doc, &Path) -> Result<(), String>,
     convert: &dyn Fn(&Path, &Path) -> Result<(), String>,
 ) -> Result<(), String> {
-    let file = doc.file(root);
     let mut regenerate = false;
     match status(root, doc) {
-        RefStatus::Ok | RefStatus::Unpinned(_) => {}
+        RefStatus::Ok | RefStatus::Unpinned(_) => return Ok(()),
         RefStatus::NoText => regenerate = true,
         RefStatus::Missing if doc.manual => {
             let how = doc.how.as_deref().unwrap_or("");
-            println!("manual {}: {how} (expected {})", doc.id, file.display());
+            println!(
+                "manual {}: {how} (expected {})",
+                doc.id,
+                doc.file(root).display()
+            );
             return Ok(());
         }
         RefStatus::Changed if doc.manual => {
             return Err(format!(
                 "checksum mismatch for the manual download {}",
-                file.display()
+                doc.file(root).display()
             ));
         }
-        RefStatus::Missing | RefStatus::Changed => {
-            let sha = doc.sha256.as_deref().unwrap_or("");
-            let tmp = file.with_extension(format!("{}.part", doc.format.ext()));
-            if let Some(dir) = file.parent() {
-                std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
-            }
-            if let Err(e) = download(doc, &tmp) {
-                drop(std::fs::remove_file(&tmp));
-                return Err(e);
-            }
-            place(&tmp, &file, sha)?;
-            regenerate = true;
-        }
+        RefStatus::Missing | RefStatus::Changed => {}
     }
-    if regenerate && let Some(text) = doc.text(root) {
-        if let Some(dir) = text.parent() {
-            std::fs::create_dir_all(dir).map_err(|e| format!("{}: {e}", dir.display()))?;
+    let (files, texts) = check_dirs(root)?;
+    let file = files.join(format!("{}.{}", doc.id, doc.format.ext()));
+    let text = doc
+        .format
+        .text_ext()
+        .map(|ext| texts.join(format!("{}.{ext}", doc.id)));
+    if !regenerate {
+        let sha = doc.sha256.as_deref().unwrap_or("");
+        let tmp = file.with_extension(format!("{}.part", doc.format.ext()));
+        writable(&files, &file)?;
+        writable(&files, &tmp)?;
+        if let Err(e) = download(doc, &tmp) {
+            drop(std::fs::remove_file(&tmp));
+            return Err(e);
         }
+        place(&tmp, &file, sha)?;
+    }
+    if let Some(text) = text {
+        writable(&texts, &text)?;
+        writable(&texts, &part_of(&text))?;
         if let Err(e) = convert(&file, &text) {
             drop(std::fs::remove_file(&text));
             return Err(e);
@@ -316,28 +421,16 @@ fn curl_download(doc: &Doc, out: &Path) -> Result<(), String> {
     }
 }
 
-/// The real conversion: `pdftotext -layout` for a PDF, a copy for `html` and `md`, writing to
-/// a temporary name and renaming on success.
+/// The real conversion: `pdftotext -layout` under a deadline for a PDF, a copy for `html` and
+/// `md`, writing to a temporary name and renaming on success.
 fn real_convert(src: &Path, dest: &Path) -> Result<(), String> {
-    let tmp = dest.with_extension("part");
-    let result = if src.extension().is_some_and(|e| e == "pdf") {
-        std::process::Command::new("pdftotext")
-            .arg("-layout")
-            .arg(src)
-            .arg(&tmp)
-            .status()
-            .map_err(|e| format!("cannot start `pdftotext`: {e}"))
-            .and_then(|s| {
-                s.success()
-                    .then_some(())
-                    .ok_or_else(|| format!("`pdftotext` failed ({s}) for {}", src.display()))
-            })
-    } else {
-        std::fs::copy(src, &tmp)
-            .map(drop)
-            .map_err(|e| format!("cannot copy {}: {e}", src.display()))
-    };
-    result
+    if src.extension().is_some_and(|e| e == "pdf") {
+        return pdf_to_text("pdftotext", &["-layout"], src, dest, CONVERT_DEADLINE);
+    }
+    let tmp = part_of(dest);
+    std::fs::copy(src, &tmp)
+        .map(drop)
+        .map_err(|e| format!("cannot copy {}: {e}", src.display()))
         .and_then(|()| std::fs::rename(&tmp, dest).map_err(|e| format!("{}: {e}", dest.display())))
         .inspect_err(|_| drop(std::fs::remove_file(&tmp)))
 }
@@ -674,5 +767,193 @@ mod tests {
         assert!(calls.borrow().is_empty());
         assert_eq!(*convert_calls.borrow(), 0);
         drop(fs::remove_dir_all(&root));
+    }
+
+    #[test]
+    fn curl_args_carry_both_timeouts() {
+        let args = curl_args("https://example.org/a.pdf", Path::new("/t/out"));
+        let at = |s: &str| args.iter().position(|a| a == s).expect(s);
+        assert_eq!(args[at("--connect-timeout") + 1], "30");
+        assert_eq!(args[at("--max-time") + 1], "3600");
+    }
+
+    #[test]
+    fn a_conversion_past_its_deadline_is_killed_and_leaves_nothing() {
+        let root = tree("deadline");
+        let src = root.join("reference/files/a.pdf");
+        let dest = root.join("reference/text/a.txt");
+        fs::write(&src, "abc").unwrap();
+        // $1 = -layout, $2 = src, $3 = the temporary text: write some, then hang.
+        let script = "echo half > \"$3\"; exec sleep 31";
+        let start = std::time::Instant::now();
+        let r = pdf_to_text(
+            "sh",
+            &["-c", script, "sh", "-layout"],
+            &src,
+            &dest,
+            Duration::from_secs(1),
+        );
+        assert!(r.is_err(), "{r:?}");
+        assert!(
+            start.elapsed() < Duration::from_secs(2),
+            "{:?}",
+            start.elapsed()
+        );
+        assert_eq!(
+            fs::read_dir(root.join("reference/text")).unwrap().count(),
+            0
+        );
+        let left = std::process::Command::new("pgrep")
+            .args(["-f", "sleep 31"])
+            .output()
+            .unwrap();
+        assert!(left.stdout.is_empty(), "sleep still running");
+        drop(fs::remove_dir_all(&root));
+    }
+
+    #[test]
+    fn a_conversion_that_finishes_is_renamed_into_place() {
+        let root = tree("convert-ok");
+        let src = root.join("reference/files/a.pdf");
+        let dest = root.join("reference/text/a.txt");
+        fs::write(&src, "abc").unwrap();
+        pdf_to_text(
+            "sh",
+            &["-c", "echo done > \"$3\"", "sh", "-layout"],
+            &src,
+            &dest,
+            Duration::from_secs(10),
+        )
+        .unwrap();
+        assert_eq!(fs::read_to_string(&dest).unwrap(), "done\n");
+        assert!(!root.join("reference/text/a.part").exists());
+        drop(fs::remove_dir_all(&root));
+    }
+
+    #[cfg(unix)]
+    use std::os::unix::fs::symlink;
+
+    #[cfg(unix)]
+    #[test]
+    fn check_dirs_accepts_a_real_tree_and_creates_the_two_directories() {
+        let root = tree("dirs-ok");
+        fs::remove_dir(root.join("reference/text")).unwrap();
+        let (files, text) = check_dirs(&root).unwrap();
+        let canon = fs::canonicalize(&root).unwrap();
+        assert_eq!(files, canon.join("reference/files"));
+        assert_eq!(text, canon.join("reference/text"));
+        assert!(text.is_dir());
+        drop(fs::remove_dir_all(&root));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn check_dirs_rejects_a_symlinked_reference_files_and_text() {
+        let elsewhere = tree("dirs-target");
+        let root = tree("dirs-link");
+        fs::remove_dir_all(root.join("reference")).unwrap();
+        symlink(elsewhere.join("reference"), root.join("reference")).unwrap();
+        assert!(check_dirs(&root).is_err());
+        fs::remove_file(root.join("reference")).unwrap();
+        fs::create_dir_all(root.join("reference")).unwrap();
+        symlink(
+            elsewhere.join("reference/files"),
+            root.join("reference/files"),
+        )
+        .unwrap();
+        assert!(check_dirs(&root).is_err());
+        fs::remove_file(root.join("reference/files")).unwrap();
+        fs::create_dir(root.join("reference/files")).unwrap();
+        symlink(
+            elsewhere.join("reference/text"),
+            root.join("reference/text"),
+        )
+        .unwrap();
+        assert!(check_dirs(&root).is_err());
+        drop(fs::remove_dir_all(&root));
+        drop(fs::remove_dir_all(&elsewhere));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn writable_accepts_a_file_in_files_and_rejects_a_symlink_and_another_directory() {
+        let root = tree("writable");
+        let files = fs::canonicalize(root.join("reference/files")).unwrap();
+        writable(&files, &files.join("a.pdf")).unwrap();
+        fs::write(files.join("real.pdf"), "x").unwrap();
+        writable(&files, &files.join("real.pdf")).unwrap();
+        symlink(root.join("elsewhere"), files.join("link.pdf")).unwrap();
+        assert!(writable(&files, &files.join("link.pdf")).is_err());
+        assert!(writable(&files, &root.join("reference/text/a.txt")).is_err());
+        assert!(writable(&files, &files.join("sub/a.pdf")).is_err());
+        drop(fs::remove_dir_all(&root));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn fetch_all_touches_nothing_behind_a_symlink() {
+        // A symlinked text/<id>.txt, dangling, so the entry looks `no-text`.
+        let root = tree("fetch-link-file");
+        let outside = root.join("outside.txt");
+        fs::write(root.join("reference/files/a.pdf"), "abc").unwrap();
+        symlink(&outside, root.join("reference/text/a.txt")).unwrap();
+        let docs = [doc("a", Format::Pdf, Some(SHA_A), false)];
+        let calls = RefCell::new(Vec::new());
+        assert!(fetch_all(&root, &docs, &fake_download(&calls, &[]), &fake_convert).is_err());
+        assert!(!outside.exists(), "wrote through the symlink");
+        drop(fs::remove_dir_all(&root));
+
+        // A symlinked files/: the download must not land in the target.
+        let root = tree("fetch-link-files");
+        let target = tree("fetch-link-files-target");
+        fs::remove_dir_all(root.join("reference/files")).unwrap();
+        symlink(target.join("reference/files"), root.join("reference/files")).unwrap();
+        let calls = RefCell::new(Vec::new());
+        assert!(fetch_all(&root, &docs, &fake_download(&calls, &[]), &fake_convert).is_err());
+        assert!(calls.borrow().is_empty());
+        assert_eq!(
+            fs::read_dir(target.join("reference/files"))
+                .unwrap()
+                .count(),
+            0
+        );
+        drop(fs::remove_dir_all(&root));
+        drop(fs::remove_dir_all(&target));
+
+        // A symlinked reference/.
+        let root = tree("fetch-link-ref");
+        let target = tree("fetch-link-ref-target");
+        fs::remove_dir_all(root.join("reference")).unwrap();
+        symlink(target.join("reference"), root.join("reference")).unwrap();
+        let calls = RefCell::new(Vec::new());
+        assert!(fetch_all(&root, &docs, &fake_download(&calls, &[]), &fake_convert).is_err());
+        assert!(calls.borrow().is_empty());
+        assert_eq!(
+            fs::read_dir(target.join("reference/files"))
+                .unwrap()
+                .count(),
+            0
+        );
+        drop(fs::remove_dir_all(&root));
+        drop(fs::remove_dir_all(&target));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn an_ok_entry_is_not_checked() {
+        // `reference/` is a symlink, which check_dirs rejects; an `ok` entry still passes
+        // because it writes nothing.
+        let target = tree("ok-unchecked-target");
+        fs::write(target.join("reference/files/a.pdf"), "abc").unwrap();
+        fs::write(target.join("reference/text/a.txt"), "t").unwrap();
+        let root = tree("ok-unchecked");
+        fs::remove_dir_all(root.join("reference")).unwrap();
+        symlink(target.join("reference"), root.join("reference")).unwrap();
+        let docs = [doc("a", Format::Pdf, Some(SHA_A), false)];
+        let calls = RefCell::new(Vec::new());
+        fetch_all(&root, &docs, &fake_download(&calls, &[]), &fake_convert).unwrap();
+        assert!(calls.borrow().is_empty());
+        drop(fs::remove_dir_all(&root));
+        drop(fs::remove_dir_all(&target));
     }
 }
