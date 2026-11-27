@@ -40,7 +40,7 @@ QEMU 11.1.3 searches `/opt/homebrew/Cellar/qemu/11.1.3/bin/../share/qemu-firmwar
 ### The x86 UEFI image must be pflash
 
 - `qemu-system-x86_64 -bios /opt/homebrew/share/qemu/edk2-x86_64-code.fd` exits 1 with `qemu: could not load PC BIOS '...edk2-x86_64-code.fd'` (measured here, twice: the log line on the seed transcript's command, and step 7).
-- The same image given as `-M q35 -drive if=pflash,format=raw,readonly=on,file=...` reaches the UEFI shell (measured here). The aarch64 image does boot with `-bios` (measured here). The correction to `toolchain-and-boot.md` is step 8's.
+- The same image given as `-M q35 -drive if=pflash,format=raw,readonly=on,file=...` reaches the UEFI shell (measured here). The aarch64 image does boot with `-bios` (measured here).
 
 ### Accelerators
 

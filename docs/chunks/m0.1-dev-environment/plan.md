@@ -140,3 +140,5 @@ Choices the spec leaves to implementation:
 - Step 8 (maintainer's choice, 2026-11-27): topic 6 also lists three leads for M2, with citations and no decision: raw kernel images from ELF (`llvm-tools`, `cargo-binutils`), rust-analyzer's per-crate target for `no_std` crates, Homebrew version drift (`brew pin`).
 - Step 9 (maintainer's choice, 2026-11-27): "Setting up" also names the prerequisites (Homebrew, rustup, Xcode Command Line Tools).
 - Step 7: the note's entry in `docs/research/README.md` Contents is added with step 7, not step 9, because `check-docs` requires it as soon as the note exists.
+- After step 6: a fix to step 5's `fetch_all` output (`cdf31b7`): a missing manual entry printed `ok <id>` after its `how` line. `x86-64-psabi` is `manual` but keeps its `sha256`, so its local copy is `ok`.
+- Stage 5: a second spec amendment (review findings: the sweep reads pids only and re-checks each with `ps`; `curl --disable --globoff`; two §6 limits), approved by the maintainer, and fix round 1 for the code review's findings.
