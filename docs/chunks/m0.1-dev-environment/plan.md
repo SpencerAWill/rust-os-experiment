@@ -1,6 +1,6 @@
 # M0.1 plan: Development environment
 
-- **Status:** Accepted (2026-11-27).
+- **Status:** Historical: executed in PR #11 (2026-11-27); the spec and the code are authoritative.
 - **Spec:** [spec.md](spec.md). This plan argues from the spec; read both. Progress and surprises go in [log.md](log.md).
 
 ## 1. Approach

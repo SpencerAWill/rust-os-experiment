@@ -22,7 +22,7 @@ Row statuses: `Planned`, `Drafting`, `Accepted`, `In progress`, `Done (PR #n)`, 
 | Chunk | Title | Depends on | Status | Spec and plan |
 |---|---|---|---|---|
 | M0.0 | Repository foundations: the chunk workflow with build and research chunks, agent roles and skills, the push guard, `cargo xtask` process checks, CI, Pulumi-managed settings, the issue Project, ADRs 0001-0002, research notes from the initial architecture conversation | none | Done (PR #1) | [spec](chunks/m0.0-foundations/spec.md), [plan](chunks/m0.0-foundations/plan.md) |
-| M0.1 | Development environment: host tools and Rust targets, `cargo xtask doctor`, a local reference library of specifications, and the tool survey as a research note | M0.0 | In progress | [spec](chunks/m0.1-dev-environment/spec.md), [plan](chunks/m0.1-dev-environment/plan.md) |
+| M0.1 | Development environment: host tools and Rust targets, `cargo xtask doctor`, a local reference library of specifications, and the tool survey as a research note | M0.0 | Done (PR #11) | [spec](chunks/m0.1-dev-environment/spec.md), [plan](chunks/m0.1-dev-environment/plan.md) |
 
 ## M1 chunks (research)
 

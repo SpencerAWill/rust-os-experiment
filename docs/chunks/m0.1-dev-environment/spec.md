@@ -1,6 +1,6 @@
 # M0.1: Development environment
 
-- **Status:** Amended (2026-11-27): host safety (§4.3, §4.4, §6, §8, R15, R16). Accepted 2026-11-27. Second amendment of 2026-11-27, review findings (§4.3, §4.4, §6, §8): accepted 2026-11-27.
+- **Status:** Implemented (PR #11, 2026-11-27). Accepted 2026-11-27; amended 2026-11-27 for host safety (§4.3, §4.4, §6, §8, R15, R16) and again for the review findings (§4.3, §4.4, §6, §8).
 - **Kind:** build · **Milestone:** M0 (repository foundations) · **Depends on:** M0.0 · **Decides:** no ADR · **Followed by:** M1.1
 - **Issue:** none
 - **Estimated size:** about 900 changed lines, excluding tests, lockfiles and generated files (xtask about 550, the research note about 200, documents about 150)
@@ -211,9 +211,9 @@ An entry that cannot be fetched by a stable direct URL (a click-through licence,
 
 ## 9. Done when
 
-- [ ] R1-R14 hold, with the evidence of §8.
-- [ ] `cargo xtask ci` passes locally and in CI.
-- [ ] The pull request lists the reviews of [CONTRIBUTING.md](../../../CONTRIBUTING.md#reviews-before-a-pull-request): code, security (network fetch, new dependencies), docs, spec, sources (the note), and conditional for architecture portability.
+- [ ] R1-R16 hold, with the evidence of §8: R2-R16 met (review-spec at `463cede`, review-sources for R12, final run on `9e2a486` in [log.md](log.md)); R1's CI result and the CI time pair are pending PR #11's run.
+- [ ] `cargo xtask ci` passes locally and in CI: locally on `9e2a486` and after (log.md); in CI pending PR #11's run.
+- [x] The pull request lists the reviews of [CONTRIBUTING.md](../../../CONTRIBUTING.md#reviews-before-a-pull-request): code, security (network fetch, new dependencies), docs, spec, sources (the note), and conditional for architecture portability.
 
 ## 10. Open questions
 
