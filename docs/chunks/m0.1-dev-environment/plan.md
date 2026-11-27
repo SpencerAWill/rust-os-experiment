@@ -81,7 +81,7 @@ Choices the spec leaves to implementation:
 
 ### Step 6: the manifest's entries (R11, R14 in part)
 
-- [ ] **Who:** builder
+- [x] **Who:** builder
 - **Files:** `reference/manifest.toml`, `log.md`
 - **Test first:** `cargo xtask refs` lists 0 of the spec §4.4 documents.
 - **Change:** one entry per document of spec §4.4, at the latest version on the publisher's site (versioned URL where one exists), with the checksum taken from a download; `manual` with `how` where no stable direct URL exists. Licence text as the publisher states it.
@@ -136,3 +136,4 @@ Choices the spec leaves to implementation:
 - Step 2: the `doctor.rs` tests were written after the code (only the `parse` test ran red first); stage 5's code review is asked to check that each can fail. `doctor` reads `rust-toolchain.toml` with a hand parser until step 5 adds `toml`, and finds the root with `git rev-parse --show-toplevel`.
 - Step 3: `riscv64-opensbi` runs with `-bios default` but still requires check 4 to have found `opensbi-riscv64-generic-fw_dynamic.bin` (the file `default` loads); the spec does not say.
 - Step 5: `xtask/src/check_docs/readme.rs` also changed (its test counts `REQUIRED_READMES`, lesson docs-2), and `reference/README.md` moved `files/` and `text/` out of Contents. Doctor check 7 prints one summary line with the counts (§4.3's "the count missing or changed"); a present `manual` entry whose checksum changed fails `refs --fetch`, since it cannot be re-downloaded. Doctor's hand-written `rust-toolchain.toml` parser was replaced by `toml`.
+- Step 6: the RISC-V unprivileged and privileged manuals are one entry (`riscv-isa-manual`, the release's combined PDF), so the manifest has 21 entries for spec §4.4's 22 documents. Eight are `manual`: AMD's portal, Arm's five (no direct PDF URL), the gABI (HTML pages only) and the x86-64 psABI (a CI artifact).

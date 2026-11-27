@@ -1,2 +1,213 @@
 # The reference library: one [[doc]] table per document. See README.md.
 # Fields: id, title, version, url, sha256, format, licence; optional manual = true with how.
+
+# x86
+
+[[doc]]
+id = "intel-sdm"
+title = "Intel 64 and IA-32 Architectures Software Developer's Manual, combined volumes 1, 2A-D, 3A-D, 4"
+version = "325462-093"
+url = "https://cdrdv2-public.intel.com/929349/325462-093-sdm-vol-1-2abcd-3abcd-4.pdf"
+sha256 = "a4a62e6a7ba11a76c7753a195b825087306812aac39b930973f9168ee599f321"
+format = "pdf"
+licence = "Intel, in the document: \"No license (express or implied, by estoppel or otherwise) to any intellectual property rights is granted by this document, with the sole exception that a) you may publish an unmodified copy and b) code, identified as Sample Code in this document is licensed subject to the Zero-Clause BSD open source license (0BSD)... No rights are granted to create modifications or derivatives of this document.\""
+
+[[doc]]
+id = "amd-apm"
+title = "AMD64 Architecture Programmer's Manual, Volumes 1-5 (publication 40332)"
+version = "4.11 (2026-10-29)"
+url = "https://docs.amd.com/v/u/en-US/40332_4.11_APM_Vol1-5"
+format = "pdf"
+licence = "not read: the AMD portal page is a script-driven viewer that this step could not read for terms; AMD's terms apply and are unverified here"
+manual = true
+how = "Open the URL (AMD Technical Information Portal), choose \"Download document\", and save the PDF at reference/files/amd-apm.pdf. The portal has no stable direct URL. Revision and date are from the portal's search listing for 40332pub."
+
+# Arm: developer.arm.com redirects to support.arm.com, a page rendered by scripts with no direct PDF
+# URL (curl, 2026-11-27: HTTP 200 text/html), so these are manual.
+
+[[doc]]
+id = "arm-arm"
+title = "Arm Architecture Reference Manual for A-profile architecture (DDI 0487, now document 102105)"
+version = "latest on the publisher's page; issue letter not confirmed (page unreadable on 2026-11-27)"
+url = "https://developer.arm.com/documentation/ddi0487/latest"
+format = "pdf"
+licence = "not read: the publisher's page returned HTTP 403 to automated clients; Arm's terms apply and are unverified here"
+manual = true
+how = "Open the URL, download the latest PDF of the Arm Architecture Reference Manual for A-profile architecture (accept Arm's terms if asked), save it at reference/files/arm-arm.pdf, then run `cargo xtask refs` for its digest and record the issue letter in `version`."
+
+[[doc]]
+id = "arm-gic"
+title = "Arm Generic Interrupt Controller Architecture Specification, GICv3 and GICv4 (IHI 0069)"
+version = "latest on the publisher's page; issue letter not confirmed (page unreadable on 2026-11-27)"
+url = "https://developer.arm.com/documentation/ihi0069/latest"
+format = "pdf"
+licence = "not read: the publisher's page returned HTTP 403 to automated clients; Arm's terms apply and are unverified here"
+manual = true
+how = "Open the URL, download the latest PDF (accept Arm's terms if asked), save it at reference/files/arm-gic.pdf, then run `cargo xtask refs` for its digest and record the issue letter in `version`."
+
+[[doc]]
+id = "arm-psci"
+title = "Arm Power State Coordination Interface (PSCI, DEN 0022)"
+version = "latest on the publisher's page; issue not confirmed (page unreadable on 2026-11-27)"
+url = "https://developer.arm.com/documentation/den0022/latest"
+format = "pdf"
+licence = "not read: the publisher's page returned HTTP 403 to automated clients; Arm's terms apply and are unverified here"
+manual = true
+how = "Open the URL, download the latest PDF (accept Arm's terms if asked), save it at reference/files/arm-psci.pdf, then run `cargo xtask refs` for its digest and record the issue in `version`."
+
+[[doc]]
+id = "arm-smccc"
+title = "Arm SMC Calling Convention (SMCCC, DEN 0028)"
+version = "latest on the publisher's page; issue not confirmed (page unreadable on 2026-11-27)"
+url = "https://developer.arm.com/documentation/den0028/latest"
+format = "pdf"
+licence = "not read: the publisher's page returned HTTP 403 to automated clients; Arm's terms apply and are unverified here"
+manual = true
+how = "Open the URL, download the latest PDF (accept Arm's terms if asked), save it at reference/files/arm-smccc.pdf, then run `cargo xtask refs` for its digest and record the issue in `version`."
+
+[[doc]]
+id = "arm-aapcs64"
+title = "Procedure Call Standard for the Arm 64-bit Architecture (AAPCS64)"
+version = "2026Q3 (issued 2026-11-03)"
+url = "https://github.com/ARM-software/abi-aa/releases/download/2026Q3/aapcs64.pdf"
+sha256 = "b284bd0295a8741ae0dbc54d69712af45008de42bcf8bd84882652637e464004"
+format = "pdf"
+licence = "ARM-software/abi-aa README: \"All the open-source ABI documents are licensed under the Creative Commons Attribution-ShareAlike 4.0 International License + grant of Patent License.\""
+
+[[doc]]
+id = "arm-aarchmrs"
+title = "Arm Architecture Machine Readable Specification (AARCHMRS), A-profile open-source package"
+version = "2026-09 (from a third-party listing; not confirmed at the publisher)"
+url = "https://developer.arm.com/Architectures/A-Profile%20Architecture"
+format = "tar.gz"
+licence = "not read: the publisher's page returned HTTP 403 to automated clients; the package's own licence file is unverified here"
+manual = true
+how = "Open the URL, find the A-profile AARCHMRS open-source download (a tar.gz named like AARCHMRS_OPENSOURCE_A_profile-<date>.tar.gz) under Exploration Tools, accept the terms if asked, save it at reference/files/arm-aarchmrs.tar.gz, then run `cargo xtask refs` for its digest and record the release in `version`."
+
+# RISC-V
+
+[[doc]]
+id = "riscv-isa-manual"
+title = "The RISC-V Instruction Set Manual: Volume I Unprivileged Architecture and Volume II Privileged Architecture (one combined PDF)"
+version = "20261127 intermediate release (tag riscv-isa-release-23f3bda-2026-11-27)"
+url = "https://github.com/riscv/riscv-isa-manual/releases/download/riscv-isa-release-23f3bda-2026-11-27/riscv-spec.pdf"
+sha256 = "9daf8e5785e53a9988268839f08c76ac00c254fbf611aa67f6f5042a4a943f6f"
+format = "pdf"
+licence = "In the document: \"This document is released under a Creative Commons Attribution 4.0 International License.\""
+
+[[doc]]
+id = "riscv-sbi"
+title = "RISC-V Supervisor Binary Interface Specification"
+version = "3.0 (ratified 2025-07-16)"
+url = "https://github.com/riscv-non-isa/riscv-sbi-doc/releases/download/v3.0/riscv-sbi.pdf"
+sha256 = "2fc63fd1ab68d2df302c509763ed893fb5ed8a83523bac9246b98020d0c19cd9"
+format = "pdf"
+licence = "In the document: \"It is licensed under the Creative Commons Attribution 4.0 International License (CC-BY 4.0).\""
+
+[[doc]]
+id = "riscv-aia"
+title = "The RISC-V Advanced Interrupt Architecture"
+version = "1.0, revised 20250312"
+url = "https://github.com/riscv/riscv-aia/releases/download/20250312/riscv-interrupts-20250312.pdf"
+sha256 = "2d359579dcb84c6d00a1b284db3a7f8ec8c87764d96406a45cbaa9052f04c7c8"
+format = "pdf"
+licence = "In the document: \"This document is released under a Creative Commons Attribution 4.0 International License.\""
+
+[[doc]]
+id = "riscv-psabi"
+title = "RISC-V ABIs Specification (ELF psABI)"
+version = "1.0 (ratified; release v1.0, 2022-11-08)"
+url = "https://github.com/riscv-non-isa/riscv-elf-psabi-doc/releases/download/v1.0/riscv-abi.pdf"
+sha256 = "a8d06bdcaa82a6a4567a1904dc27ef1ca1043ebaa1f523558c927a9d72bc23d9"
+format = "pdf"
+licence = "In the document: \"It is licensed under the Creative Commons Attribution 4.0 International License (CC-BY 4.0).\""
+
+# Firmware and boot
+
+[[doc]]
+id = "uefi"
+title = "Unified Extensible Firmware Interface (UEFI) Specification"
+version = "2.11 (released December 2024)"
+url = "https://uefi.org/sites/default/files/resources/UEFI_Spec_Final_2.11.pdf"
+sha256 = "a64b8e442004b91becc3de9afaf8ca61b259a9a3b436accb6b3711ab5400cee9"
+format = "pdf"
+licence = "uefi.org/specifications: \"The UEFI Specifications identified below are available for downloading and to read only. By downloading any of the UEFI Specifications, you acknowledge that no license, express or implied, is granted to you to distribute, additionally reproduce, implement or otherwise use for any purpose (other than to read only) the UEFI Specifications\""
+
+[[doc]]
+id = "acpi"
+title = "Advanced Configuration and Power Interface (ACPI) Specification"
+version = "6.6 (released May 2025)"
+url = "https://uefi.org/sites/default/files/resources/ACPI_Spec_6.6.pdf"
+sha256 = "8c7542dd4de974ae47bba71bb0336637fe1e3838daad7692370ab4cf218efd35"
+format = "pdf"
+licence = "uefi.org/specifications (the page that lists it): \"The UEFI Specifications identified below are available for downloading and to read only. By downloading any of the UEFI Specifications, you acknowledge that no license, express or implied, is granted to you to distribute, additionally reproduce, implement or otherwise use for any purpose (other than to read only) the UEFI Specifications\""
+
+[[doc]]
+id = "devicetree"
+title = "Devicetree Specification"
+version = "0.4 (2023-06-28)"
+url = "https://github.com/devicetree-org/devicetree-specification/releases/download/v0.4/devicetree-specification-v0.4.pdf"
+sha256 = "c141dd78af0971fffed19433f84af5beab6aa058cfff2e33076805cef9f92e02"
+format = "pdf"
+licence = "In the document, License Information: \"Licensed under the Apache License, Version 2.0 (the \"License\"); you may not use this file except in compliance with the License.\""
+
+[[doc]]
+id = "limine"
+title = "Limine boot loader release (contains the Limine boot protocol, limine-protocol/PROTOCOL.md)"
+version = "12.11.2"
+url = "https://github.com/Limine-Bootloader/Limine/releases/download/v12.11.2/limine-12.11.2.tar.gz"
+sha256 = "985341dec2e51e91e5c0ea8717a705b51ed2a4f694091bbad4fb64731d522aaf"
+format = "tar.gz"
+licence = "In the archive: COPYING (\"Copyright (C) 2019-2026 Mintsuki and contributors. Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met\", two numbered conditions) and limine-protocol/LICENSE (\"Permission to use, copy, modify, and/or distribute this software for any purpose with or without fee is hereby granted.\")"
+
+# Devices and formats
+
+[[doc]]
+id = "virtio"
+title = "Virtual I/O Device (VIRTIO) Specification"
+version = "1.4, Committee Specification 01 (2026-04-08)"
+url = "https://docs.oasis-open.org/virtio/virtio/v1.4/cs01/virtio-v1.4-cs01.pdf"
+sha256 = "497b7b989b5161444e87866c264a46be90911b8f4738eadf4dd4f52eb37c8727"
+format = "pdf"
+licence = "In the document, Notices: \"This document and translations of it may be copied and furnished to others, and derivative works that comment on or otherwise explain it or assist in its implementation may be prepared, copied, published, and distributed, in whole or in part, without restriction of any kind, provided that the above copyright notice and this section are included on all such copies and derivative works. However, this document itself may not be modified in any way\""
+
+[[doc]]
+id = "sysv-gabi"
+title = "System V Application Binary Interface, generic ELF (gABI 4.1+ draft, many HTML pages)"
+version = "DRAFT 24 April 2001"
+url = "https://refspecs.linuxfoundation.org/elf/gabi4+/contents.html"
+format = "html"
+licence = "not read: the pages carry no licence statement that this step found; terms unverified"
+manual = true
+how = "The publisher offers only a set of HTML pages (no PDF or archive). Open the contents page and save it as reference/files/sysv-gabi.html if a single-page copy is wanted; the library does not need it to be complete."
+
+[[doc]]
+id = "x86-64-psabi"
+title = "System V Application Binary Interface, AMD64 Architecture Processor Supplement (x86-64 psABI)"
+version = "1.0 (March 12, 2025), PDF built by the project's CI from commit e1ce0983"
+url = "https://gitlab.com/x86-psABIs/x86-64-ABI/-/jobs/9388606854/artifacts/raw/x86-64-ABI/abi.pdf"
+sha256 = "19f346cc723dbeb6ad80494614291f4e85aba3caca48dcfd537d33f82af6d6ac"
+format = "pdf"
+manual = true
+how = "The project publishes no release PDF; the URL is a CI job artifact, which GitLab may expire. Download it from the URL if it still works, or from the latest successful pipeline of the x86-64-ABI project, and save it at reference/files/x86-64-psabi.pdf; a different build changes the digest, so update `version` and `sha256`."
+licence = "In the document's Revision History: \"Changes to this document made by Intel Corporation are copyright Intel Corporation and licensed under CC BY 4.0\"; no statement covering the rest was found"
+
+# Machine-readable
+
+[[doc]]
+id = "riscv-opcodes"
+title = "riscv-opcodes (commit archive: the repository has no tags)"
+version = "master at 0a7bd769454e40675f3920edd71b02bb016a3c8d (2026-11-25)"
+url = "https://github.com/riscv/riscv-opcodes/archive/0a7bd769454e40675f3920edd71b02bb016a3c8d.tar.gz"
+sha256 = "a39d5d520fd95605a1b585236d1ed69a913666e7509fb4fa78dff63ba8698ed3"
+format = "tar.gz"
+licence = "In the repository's LICENSE: \"Copyright (c) 2022 RISC-V International. Redistribution and use in source and binary forms, with or without modification, are permitted provided that the following conditions are met\" (BSD 3-clause, as GitHub reports)"
+
+[[doc]]
+id = "riscv-udb"
+title = "RISC-V Unified Database (UDB) snapshot"
+version = "v0.1.0 (the only plain version tag, 2025-02-01)"
+url = "https://github.com/riscv-software-src/riscv-unified-db/archive/refs/tags/v0.1.0.tar.gz"
+sha256 = "db96bd10766c8874e0039f88c3eaf660394a38c558424f4eb121a1387c558c8e"
+format = "tar.gz"
+licence = "In the repository's LICENSE at v0.1.0: \"SPDX-License-Identifier: BSD-3-Clause-Clear. Copyright (c) 2024, Qualcomm Innovation Center, Inc. All rights reserved.\""
