@@ -9,6 +9,7 @@ mod check_workflows;
 mod cmd;
 mod doctor;
 mod guard_push;
+mod refs;
 
 use std::process::ExitCode;
 
@@ -31,6 +32,9 @@ enum Command {
     CheckWorkflows,
     CheckDocs,
     Doctor,
+    Refs {
+        fetch: bool,
+    },
     GuardPush,
     Ci {
         quick: bool,
@@ -40,7 +44,7 @@ enum Command {
 /// Parses command-line arguments (without the program name).
 fn parse(args: &[&str]) -> Result<Command, String> {
     let (name, flags) = args.split_first().ok_or_else(|| {
-        "missing command (try: ci [--quick], fmt [--check], clippy, test, doc, deny, typos, check-workflows, check-docs, doctor)"
+        "missing command (try: ci [--quick], fmt [--check], clippy, test, doc, deny, typos, check-workflows, check-docs, doctor, refs [--fetch])"
             .to_string()
     })?;
     let has = |flag: &str| flags.contains(&flag);
@@ -65,6 +69,9 @@ fn parse(args: &[&str]) -> Result<Command, String> {
         "check-workflows" => only(&[]).map(|()| Command::CheckWorkflows),
         "check-docs" => only(&[]).map(|()| Command::CheckDocs),
         "doctor" => only(&[]).map(|()| Command::Doctor),
+        "refs" => only(&["--fetch"]).map(|()| Command::Refs {
+            fetch: has("--fetch"),
+        }),
         "guard-push" => only(&[]).map(|()| Command::GuardPush),
         "ci" => only(&["--quick"]).map(|()| Command::Ci {
             quick: has("--quick"),
@@ -193,6 +200,7 @@ fn execute(command: &Command) -> Result<(), String> {
         Command::CheckWorkflows => check_workflows::run(),
         Command::CheckDocs => check_docs::run(),
         Command::Doctor => doctor::run(),
+        Command::Refs { fetch } => refs::run(*fetch),
         // `main` runs this one directly, since it exits with a code other than 1.
         Command::GuardPush => Err("guard-push is run by `main`".to_string()),
         Command::Ci { quick } => ci_steps(*quick).iter().try_for_each(execute),
@@ -233,6 +241,16 @@ mod tests {
     fn doctor_takes_no_flags() {
         assert_eq!(parse(&["doctor"]), Ok(Command::Doctor));
         assert!(parse(&["doctor", "--x"]).is_err());
+    }
+
+    #[test]
+    fn refs_takes_only_fetch() {
+        assert_eq!(parse(&["refs"]), Ok(Command::Refs { fetch: false }));
+        assert_eq!(
+            parse(&["refs", "--fetch"]),
+            Ok(Command::Refs { fetch: true })
+        );
+        assert!(parse(&["refs", "--x"]).is_err());
     }
 
     #[test]

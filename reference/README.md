@@ -11,12 +11,9 @@ Status: Living (2026-11-27). A local library of the specifications this project 
 
 - `README.md`: this file.
 - `manifest.toml`: one `[[doc]]` table per document, pinned by version and checksum. `cargo xtask refs` reports each entry's state offline; `cargo xtask refs --fetch` downloads what is missing or changed. The fields and the rules `xtask` enforces are in [spec §4.4 of M0.1](../docs/chunks/m0.1-dev-environment/spec.md#44-reference-library).
-- `files/`: the downloaded documents, `<id>.<format>`. Gitignored.
-- `text/`: their text, `<id>.txt` (from `pdftotext -layout`) or a copy of an `html` or `md` file. Gitignored.
-
 ## Licences
 
-No downloaded document is committed. The publishers' licences do not allow redistribution; each entry's `licence` field records what its publisher states. Only `README.md` and `manifest.toml` are tracked.
+`cargo xtask refs --fetch` writes the documents to `files/<id>.<format>` and their text to `text/<id>.txt` (from `pdftotext -layout`), or a copy of an `html` or `md` file. Both folders are gitignored: no downloaded document is committed. The publishers' licences do not allow redistribution; each entry's `licence` field records what its publisher states. Only `README.md` and `manifest.toml` are tracked.
 
 ## Citing a specification
 

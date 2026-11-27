@@ -11,11 +11,12 @@ use std::process::Command;
 
 mod boot;
 
+use crate::refs::{self, RefStatus};
+
 /// The outcome of one item.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum Status {
     Ok,
-    #[allow(dead_code, reason = "constructed by check 7 in step 5")]
     Warn,
     Skip,
     Fail,
@@ -171,39 +172,20 @@ fn search_dirs(text: &str) -> Vec<PathBuf> {
         .collect()
 }
 
-/// The quoted strings of the array assigned to `key` in `text` (a flat TOML array).
-fn toml_strings(text: &str, key: &str) -> Vec<String> {
-    let Some(start) = text
-        .lines()
-        .scan(0, |pos, l| {
-            let at = *pos;
-            *pos += l.len() + 1;
-            Some((at, l))
-        })
-        .find(|(_, l)| l.trim_start().starts_with(key) && l.contains('='))
-        .map(|(at, _)| at)
-    else {
-        return Vec::new();
-    };
-    let rest = &text[start..];
-    let Some(open) = rest.find('[') else {
-        return Vec::new();
-    };
-    let body = &rest[open + 1..];
-    let body = &body[..body.find(']').unwrap_or(body.len())];
-    body.split('"')
-        .skip(1)
-        .step_by(2)
-        .map(str::to_string)
-        .collect()
+/// The `[toolchain]` table of `rust-toolchain.toml`.
+#[derive(Debug, Default, serde::Deserialize)]
+struct ToolchainFile {
+    #[serde(default)]
+    toolchain: Toolchain,
 }
 
-/// The `channel` of a `rust-toolchain.toml`.
-fn toml_channel(text: &str) -> Option<String> {
-    text.lines().find_map(|l| {
-        let (key, value) = l.split_once('=')?;
-        (key.trim() == "channel").then(|| value.trim().trim_matches('"').to_string())
-    })
+#[derive(Debug, Default, serde::Deserialize)]
+struct Toolchain {
+    channel: Option<String>,
+    #[serde(default)]
+    components: Vec<String>,
+    #[serde(default)]
+    targets: Vec<String>,
 }
 
 /// Whether `installed` (a `rustup component list --installed` line such as
@@ -247,7 +229,18 @@ fn check_toolchain(runner: &dyn Runner, toolchain_file: Result<String, String>) 
         Ok(t) => t,
         Err(e) => return vec![Line::new(Status::Fail, C, "rust-toolchain.toml", e)],
     };
-    let Some(channel) = toml_channel(&text) else {
+    let file = match toml::from_str::<ToolchainFile>(&text) {
+        Ok(f) => f.toolchain,
+        Err(e) => {
+            return vec![Line::new(
+                Status::Fail,
+                C,
+                "rust-toolchain.toml",
+                format!("cannot parse: {e}"),
+            )];
+        }
+    };
+    let Some(channel) = file.channel else {
         return vec![Line::new(
             Status::Fail,
             C,
@@ -256,10 +249,7 @@ fn check_toolchain(runner: &dyn Runner, toolchain_file: Result<String, String>) 
         )];
     };
     let mut lines = Vec::new();
-    for (kind, wanted) in [
-        ("component", toml_strings(&text, "components")),
-        ("target", toml_strings(&text, "targets")),
-    ] {
+    for (kind, wanted) in [("component", file.components), ("target", file.targets)] {
         let args = [kind, "list", "--installed", "--toolchain", &channel];
         let listing = match runner.capture("rustup", &args) {
             Ok(c) if c.success => Ok(c.text),
@@ -434,6 +424,40 @@ fn check_accelerator(runner: &dyn Runner, state: &State, mac_arm64: bool) -> Vec
     ]
 }
 
+/// Check 7: the reference library. Never `FAIL`: a missing document only warns.
+fn check_references(statuses: Result<Vec<(String, RefStatus)>, String>) -> Vec<Line> {
+    const C: &str = "reference-library";
+    const ITEM: &str = "manifest.toml";
+    let statuses = match statuses {
+        Ok(s) => s,
+        Err(e) => return vec![Line::new(Status::Warn, C, ITEM, e)],
+    };
+    let count = |wanted: &RefStatus| statuses.iter().filter(|(_, s)| s == wanted).count();
+    let (missing, changed, no_text) = (
+        count(&RefStatus::Missing),
+        count(&RefStatus::Changed),
+        count(&RefStatus::NoText),
+    );
+    vec![if missing + changed + no_text == 0 {
+        Line::new(
+            Status::Ok,
+            C,
+            ITEM,
+            format!("{} entries present", statuses.len()),
+        )
+    } else {
+        Line::new(
+            Status::Warn,
+            C,
+            ITEM,
+            format!(
+                "{missing} missing, {changed} changed, {no_text} no-text of {}; run `cargo xtask refs --fetch`",
+                statuses.len()
+            ),
+        )
+    }]
+}
+
 /// One check: reads and updates what earlier checks found.
 type Check<'a> = &'a dyn Fn(&mut State) -> Vec<Line>;
 
@@ -458,7 +482,7 @@ fn execute(checks: &[Check<'_>], print: &mut dyn FnMut(&Line)) -> Result<(), Str
 }
 
 /// The repository root, from `git rev-parse --show-toplevel` (lesson xtask-1).
-fn repository_root(runner: &dyn Runner) -> Result<PathBuf, String> {
+pub(crate) fn repository_root(runner: &dyn Runner) -> Result<PathBuf, String> {
     match runner.capture("git", &["rev-parse", "--show-toplevel"])? {
         c if c.success => Ok(PathBuf::from(c.text.trim())),
         c => Err(format!(
@@ -485,14 +509,16 @@ pub(crate) fn run() -> Result<(), String> {
     let firmware = |s: &mut State| check_firmware(&runner, s);
     let smoke_boots = |s: &mut State| boot::check(s, &root, mac_arm64);
     let accelerator = |s: &mut State| check_accelerator(&runner, s, mac_arm64);
-    // Slot for check 7 (reference library, step 5) follows the smoke boots.
-    let checks: [Check<'_>; 6] = [
+    let references =
+        |_: &mut State| check_references(root.clone().and_then(|r| refs::statuses(&r)));
+    let checks: [Check<'_>; 7] = [
         &toolchain,
         &host_tools,
         &qemu_version,
         &firmware,
         &accelerator,
         &smoke_boots,
+        &references,
     ];
     execute(&checks, &mut |line| println!("{line}"))
 }
@@ -727,5 +753,60 @@ mod tests {
         assert_eq!(status("llvm-tools"), Status::Fail);
         assert_eq!(status("x86_64-unknown-none"), Status::Ok);
         assert_eq!(status("aarch64-unknown-none"), Status::Fail);
+    }
+
+    fn references(statuses: &[RefStatus]) -> Vec<Line> {
+        check_references(Ok(statuses
+            .iter()
+            .enumerate()
+            .map(|(i, s)| (format!("d{i}"), s.clone()))
+            .collect()))
+    }
+
+    #[test]
+    fn reference_statuses_missing_changed_and_no_text_warn() {
+        for s in [RefStatus::Missing, RefStatus::Changed, RefStatus::NoText] {
+            let lines = references(&[RefStatus::Ok, s.clone()]);
+            assert_eq!(lines.len(), 1, "{s:?}");
+            assert_eq!(lines[0].status, Status::Warn, "{s:?}");
+            assert!(
+                lines[0].detail.contains("cargo xtask refs --fetch"),
+                "{s:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn reference_statuses_ok_and_unpinned_are_ok() {
+        for s in [RefStatus::Ok, RefStatus::Unpinned("x".into())] {
+            assert_eq!(
+                references(std::slice::from_ref(&s))[0].status,
+                Status::Ok,
+                "{s:?}"
+            );
+        }
+        assert_eq!(references(&[])[0].status, Status::Ok);
+    }
+
+    #[test]
+    fn an_unreadable_manifest_warns_and_never_fails() {
+        let lines = check_references(Err("cannot read".into()));
+        assert_eq!(lines[0].status, Status::Warn);
+        assert!(lines[0].detail.contains("cannot read"));
+    }
+
+    #[test]
+    fn reference_warning_counts_missing_and_changed() {
+        let lines = references(&[
+            RefStatus::Missing,
+            RefStatus::Missing,
+            RefStatus::Changed,
+            RefStatus::NoText,
+        ]);
+        let d = &lines[0].detail;
+        assert!(
+            d.contains("2 missing") && d.contains("1 changed") && d.contains("1 no-text"),
+            "{d}"
+        );
     }
 }
