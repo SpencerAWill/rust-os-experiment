@@ -35,8 +35,13 @@ The project is dual-licensed `MIT OR Apache-2.0`. Unless you state otherwise, a 
 
 ## Setting up
 
+Prerequisites: [Homebrew](https://brew.sh), [rustup](https://rustup.rs), and the Xcode Command Line Tools (`xcode-select --install`, for the linker).
+
 ```sh
+brew bundle                 # host tools from Brewfile (QEMU, dtc, socat, poppler, acpica, gdb)
 rustup show                 # installs the pinned toolchain from rust-toolchain.toml
+cargo xtask doctor          # checks tools, firmware and accelerators; smoke-boots each architecture
+cargo xtask refs --fetch    # downloads the reference library into reference/ (gitignored)
 cargo xtask ci              # every check CI gates on, in order
 cargo xtask ci --quick      # fmt check, clippy, and tests only
 ```

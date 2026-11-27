@@ -245,7 +245,7 @@ mod tests {
             ),
             "{problems:#?}"
         );
-        assert_eq!(problems.len(), 9, "{problems:#?}");
+        assert_eq!(problems.len(), 10, "{problems:#?}");
     }
 
     #[test]

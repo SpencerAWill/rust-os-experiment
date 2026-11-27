@@ -13,6 +13,7 @@ Status: Living (2026-11-17). Research notes: what was surveyed, what it suggests
 - [`architecture-landscape.md`](architecture-landscape.md): kernel architectures and design ideas surveyed, which ones conflict, exokernel versus hypervisor, and "layers" versus planes.
 - [`shim-layer.md`](shim-layer.md): the interposition layer between a hypervisor and the exokernel: candidate features, claimed costs, names, and the proposed placement.
 - [`toolchain-and-boot.md`](toolchain-and-boot.md): bootloaders, targets, how far down Rust reaches, testing on the M4 Pro, and the documents an OS needs.
+- [`dev-environment.md`](dev-environment.md): the host tools, QEMU on the M4 Pro (smoke boots, HVF nested virtualisation, the x86 VT-x gap), ground-truth sources and second emulators, as measured for M0.1.
 - [`compatibility.md`](compatibility.md): ways to run existing software, from WASI to a Linux domain.
 - [`realities-checklist.md`](realities-checklist.md): the problems that stall OS projects, as a checklist for specs.
 - `sources/`: raw source material. [`gemini-architecture-conversation.txt`](sources/gemini-architecture-conversation.txt) is the original conversation the seed notes came from (the maintainer's questions start with `>`); it is model output, unverified, and its code is not reused.

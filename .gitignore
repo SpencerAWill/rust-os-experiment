@@ -31,3 +31,7 @@ dhat-heap*.json
 
 # macOS Finder metadata: check-docs counts untracked files that are not ignored
 .DS_Store
+
+# The reference library's downloads and their text (reference/README.md): not redistributable
+reference/files/
+reference/text/

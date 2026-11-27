@@ -26,7 +26,7 @@ const RULE_DIR: &str = ".claude/rules/";
 
 /// Directories that must have a `README.md` (spec §4.1), besides every `spikes/<topic>/` that
 /// holds tracked files.
-const REQUIRED_READMES: [&str; 9] = [
+const REQUIRED_READMES: [&str; 10] = [
     "docs",
     "docs/adr",
     "docs/chunks",
@@ -36,6 +36,7 @@ const REQUIRED_READMES: [&str; 9] = [
     "infra/github",
     "xtask",
     "spikes",
+    "reference",
 ];
 
 /// `AGENTS.md` must have fewer lines than this.
