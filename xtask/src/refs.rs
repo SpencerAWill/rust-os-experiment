@@ -324,26 +324,40 @@ fn pdf_to_text(
         .inspect_err(|_| drop(std::fs::remove_file(&tmp)))
 }
 
+/// What [`fetch_one`] did with an entry.
+#[derive(Debug, PartialEq, Eq)]
+enum Outcome {
+    /// Downloaded or converted; the entry is present afterwards.
+    Fetched,
+    /// Nothing to do; the entry was already present.
+    Present,
+    /// A `manual` entry that is absent: its instructions were printed, nothing is present.
+    ManualMissing,
+}
+
 /// Handles one entry for [`fetch_all`]. An entry that would write is first checked by
 /// [`check_dirs`] and [`writable`]; the writes use the canonical directories it returns.
 fn fetch_one(
+    out: &mut dyn std::io::Write,
     root: &Path,
     doc: &Doc,
     download: &dyn Fn(&Doc, &Path) -> Result<(), String>,
     convert: &dyn Fn(&Path, &Path) -> Result<(), String>,
-) -> Result<(), String> {
+) -> Result<Outcome, String> {
     let mut regenerate = false;
     match status(root, doc) {
-        RefStatus::Ok | RefStatus::Unpinned(_) => return Ok(()),
+        RefStatus::Ok | RefStatus::Unpinned(_) => return Ok(Outcome::Present),
         RefStatus::NoText => regenerate = true,
         RefStatus::Missing if doc.manual => {
             let how = doc.how.as_deref().unwrap_or("");
-            println!(
+            writeln!(
+                out,
                 "manual {}: {how} (expected {})",
                 doc.id,
                 doc.file(root).display()
-            );
-            return Ok(());
+            )
+            .map_err(|e| e.to_string())?;
+            return Ok(Outcome::ManualMissing);
         }
         RefStatus::Changed if doc.manual => {
             return Err(format!(
@@ -378,7 +392,7 @@ fn fetch_one(
             return Err(e);
         }
     }
-    Ok(())
+    Ok(Outcome::Fetched)
 }
 
 /// Downloads or converts what `docs` need; attempts every entry and is `Err` if any failed.
@@ -388,10 +402,22 @@ pub(crate) fn fetch_all(
     download: &dyn Fn(&Doc, &Path) -> Result<(), String>,
     convert: &dyn Fn(&Path, &Path) -> Result<(), String>,
 ) -> Result<(), String> {
+    fetch_to(&mut std::io::stdout(), root, docs, download, convert)
+}
+
+/// [`fetch_all`] with its progress lines written to `out` (errors still go to stderr).
+fn fetch_to(
+    out: &mut dyn std::io::Write,
+    root: &Path,
+    docs: &[Doc],
+    download: &dyn Fn(&Doc, &Path) -> Result<(), String>,
+    convert: &dyn Fn(&Path, &Path) -> Result<(), String>,
+) -> Result<(), String> {
     let mut failed = 0usize;
     for doc in docs {
-        match fetch_one(root, doc, download, convert) {
-            Ok(()) => println!("ok {}", doc.id),
+        match fetch_one(out, root, doc, download, convert) {
+            Ok(Outcome::ManualMissing) => {}
+            Ok(Outcome::Fetched | Outcome::Present) => drop(writeln!(out, "ok {}", doc.id)),
             Err(e) => {
                 failed += 1;
                 eprintln!("FAIL {}: {e}", doc.id);
@@ -766,6 +792,37 @@ mod tests {
         fetch_all(&root, &docs, &fake_download(&calls, &[]), &convert).unwrap();
         assert!(calls.borrow().is_empty());
         assert_eq!(*convert_calls.borrow(), 0);
+        drop(fs::remove_dir_all(&root));
+    }
+
+    #[test]
+    fn fetch_prints_ok_only_for_an_entry_that_is_present_afterwards() {
+        let root = tree("fetch-print");
+        let docs = [
+            doc("m", Format::Pdf, None, true),
+            doc("f", Format::Pdf, Some(SHA_A), false),
+        ];
+        let calls = RefCell::new(Vec::new());
+        let mut out = Vec::new();
+        fetch_to(
+            &mut out,
+            &root,
+            &docs,
+            &fake_download(&calls, &[]),
+            &fake_convert,
+        )
+        .unwrap();
+        let lines: Vec<String> = String::from_utf8(out)
+            .unwrap()
+            .lines()
+            .map(str::to_string)
+            .collect();
+        assert_eq!(lines.len(), 2, "{lines:?}");
+        assert!(
+            lines[0].starts_with("manual m: by hand (expected "),
+            "{lines:?}"
+        );
+        assert_eq!(lines[1], "ok f");
         drop(fs::remove_dir_all(&root));
     }
 
