@@ -8,6 +8,7 @@ Read this first. The rules are in [CONTRIBUTING.md](CONTRIBUTING.md), the workfl
 cargo xtask ci          # every check CI gates on; run it before saying work is done
 cargo xtask ci --quick  # fmt check, clippy, and tests only
 cargo xtask test        # nextest plus doctests
+cargo xtask doctor      # host tools, firmware and QEMU smoke boots on this machine
 ```
 
 The other commands are in [xtask/README.md](xtask/README.md).
@@ -40,6 +41,7 @@ Work is done in chunks from the roadmap, each through seven stages: brainstorm, 
 
 - **Test first.** For a bug fix, write the test, watch it fail for the reason you expect, then fix the code. Never weaken or delete a failing test without saying so.
 - **Verify before claiming.** Run the command and read its output; do not infer success from the diff. In research, a claim needs a cited source or a command that was run.
+- **Specifications**: check a claim against `reference/text/` first, then the publisher's site, then write it as unverified; cite the document id, version and section ([reference/README.md](reference/README.md#citing-a-specification)).
 - **Small logical commits**, conventional messages ending with the chunk ID, files staged by explicit path. Say in the pull request that an assistant was used.
 - **Report honestly**: a failed test, a skipped step or an unverified claim is said, with the evidence.
 - **Issues**: the path from issue to chunk and the Definition of Ready are in [docs/workflow.md](docs/workflow.md#from-issue-to-chunk); `/triage` defines issues without building anything.

@@ -108,7 +108,7 @@ Choices the spec leaves to implementation:
 
 ### Step 9: documents and agent pointers (R13)
 
-- [ ] **Who:** main session
+- [x] **Who:** main session
 - **Files:** `AGENTS.md`, `.claude/agents/researcher.md`, `.claude/agents/review-sources.md`, `CONTRIBUTING.md`, `xtask/README.md`, `docs/research/README.md`, `CHANGELOG.md`
 - **Test first:** `grep -c 'reference/' AGENTS.md .claude/agents/researcher.md .claude/agents/review-sources.md` prints 0 for each.
 - **Change:** spec §4.6 and §4.7 (pointers to `reference/README.md`, `doctor` in the Commands block, Setting up lines, the commands table, the note in Contents, the changelog line).
