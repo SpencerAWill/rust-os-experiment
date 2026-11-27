@@ -926,9 +926,14 @@ mod tests {
 
     #[test]
     fn a_child_past_its_deadline_is_killed_and_reaped() {
-        // The pid is not returned, so look for the process by its unique argument.
-        let mut unique = Command::new("sleep");
-        unique.arg("30.123");
+        // The pid is not returned, so the child records its own (kept by `exec`).
+        let dir = temp("deadline-pid");
+        let pidfile = dir.join("pid");
+        let mut unique = Command::new("sh");
+        unique.args([
+            "-c",
+            &format!("echo $$ > '{}'; exec sleep 30", pidfile.display()),
+        ]);
         let start = Instant::now();
         let r = run_with_deadline(unique, Duration::from_secs(1));
         assert!(r.is_err(), "{r:?}");
@@ -937,11 +942,12 @@ mod tests {
             "{:?}",
             start.elapsed()
         );
-        let left = Command::new("pgrep")
-            .args(["-f", "sleep 30.123"])
-            .output()
+        let pid: u32 = std::fs::read_to_string(&pidfile)
+            .unwrap()
+            .trim()
+            .parse()
             .unwrap();
-        assert!(left.stdout.is_empty(), "sleep still running");
+        assert!(!pid_running(pid), "sleep {pid} still running");
         // A child that finishes in time returns its status.
         let mut quick = Command::new("sh");
         quick.args(["-c", "exit 3"]);

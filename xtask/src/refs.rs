@@ -899,11 +899,17 @@ mod tests {
         let dest = root.join("reference/text/a.txt");
         fs::write(&src, "abc").unwrap();
         // $1 = -layout, $2 = src, $3 = the temporary text: write some, then hang.
-        let script = "echo half > \"$3\"; exec sleep 31";
+        // The script records its own pid (kept by `exec`) so the check below is by pid, not by a
+        // pattern that could match an unrelated process or one that is exiting.
+        let pidfile = root.join("pid");
+        let script = format!(
+            "echo $$ > '{}'; echo half > \"$3\"; exec sleep 31",
+            pidfile.display()
+        );
         let start = std::time::Instant::now();
         let r = pdf_to_text(
             "sh",
-            &["-c", script, "sh", "-layout"],
+            &["-c", &script, "sh", "-layout"],
             &src,
             &dest,
             Duration::from_secs(1),
@@ -918,11 +924,18 @@ mod tests {
             fs::read_dir(root.join("reference/text")).unwrap().count(),
             0
         );
-        let left = std::process::Command::new("pgrep")
-            .args(["-f", "sleep 31"])
-            .output()
+        let pid: u32 = fs::read_to_string(&pidfile)
+            .unwrap()
+            .trim()
+            .parse()
             .unwrap();
-        assert!(left.stdout.is_empty(), "sleep still running");
+        let alive = std::process::Command::new("kill")
+            .args(["-0", &pid.to_string()])
+            .output()
+            .unwrap()
+            .status
+            .success();
+        assert!(!alive, "sleep {pid} still running");
         drop(fs::remove_dir_all(&root));
     }
 
