@@ -110,3 +110,4 @@
 - 2026-11-27 done review-sources re-review of `25bb02a` (fresh, dispatched by name): the tag description, the ca34bcb0 paraphrase and the EDK2 bullet fixed; no findings. Stage 5 complete: every finding fixed or declined with a reason (PR Reviews section).
 - 2026-11-27 done PR #11 opened (`gh pr create`); close-out commit: spec Implemented, plan and log Historical, roadmap row Done (PR #11); done-when items 1 and 2 left unticked pending CI.
 - 2026-11-27 done CI time pair (spec §4.1, a record, not a budget): run 46063518573 on `5a2760d` (PR #11), every job green; `test` 53 s (20:25:37 to 20:26:30) against 25 s in run 44574212098 on `d814fe0`; `macos` 61 s against 42 s. The increase is probably the three targets and three components `rustup show` now installs, and the 69 more tests; the cause was not measured.
+- 2026-11-27 decision Correction to the line above: the test count grew by 83 (113 to 196), not 69.
