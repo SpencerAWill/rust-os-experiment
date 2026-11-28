@@ -67,7 +67,7 @@ Priority ranks unscheduled work; Order ranks scheduled work. Neither is read for
 
 ### 4.3 Chores
 
-A chore is a scheduled issue without a chunk ID, Size S, in the current milestone, with an Order. `/chunk chore #N` runs it as in the engine: branch `chore/<n>-<slug>`, one `builder` from the issue's definition (only text written by the maintainer's account is the brief), `cargo xtask ci --quick` then the full `cargo xtask ci`, one fresh `review-code` if it changes code, commit messages and the pull request title ending ` (#N)` in place of a chunk ID, `Chunk: None (chore, #N)` and `Closes #N` in the pull request, and the merge go-ahead. A chore has no spec, plan, log, compound stage or close-out commit. At a milestone boundary, open chores move to the next milestone.
+A chore is a scheduled issue without a chunk ID, Size S, in the current milestone, with an Order. `/chunk chore #N` runs it as in the engine: branch `chore/<n>-<slug>`, one `builder` from the issue's definition (only text written by the maintainer's account is the brief), `cargo xtask ci --quick` then the full `cargo xtask ci`, one fresh `review-code` if it changes code, commit messages and the pull request title ending ` (#N)` in place of a chunk ID, `Chunk: None (chore, #N)` and `Closes #N` in the pull request, and the merge go-ahead. A chore has no spec, plan, log, compound stage or close-out commit. A chore is build work only: an issue labelled `research` is always a chunk, so `/chunk chore #N` stops on one, `next` leaves such issues out of its chore list, and `docs/workflow.md` says so (maintainer, 2026-11-27). At a milestone boundary, open chores move to the next milestone.
 
 ### 4.4 Order, dependencies and "next"
 
