@@ -24,7 +24,7 @@ Every command rejects flags it does not know, and prints an install hint when a 
 | `deny` | `cargo deny`: licences, advisories, sources |
 | `typos` | Spell-check |
 | `check-workflows` | Every GitHub Action pinned to a commit hash, read-only token permissions (a `write` scope only for a job in `WRITE_ALLOWLIST`), no persisted checkout credentials, no `pull_request_target` |
-| `check-settings` | `.claude/settings.json` keeps the required deny rules, sandbox switches, read and credential denies, and relaxes the sandbox only by allowlisted entries (`EXCLUDED_ALLOWLIST`, `WRITE_PATH_ALLOWLIST`, `DOMAIN_ALLOWLIST`, `MACH_LOOKUP_ALLOWLIST`), each with a reason; reads only that file |
+| `check-settings` | `.claude/settings.json` keeps the required deny rules, sandbox switches, read and credential denies, and relaxes the sandbox only by allowlisted entries (`EXCLUDED_ALLOWLIST`, `WRITE_PATH_ALLOWLIST`, `DOMAIN_ALLOWLIST`, `MACH_LOOKUP_ALLOWLIST`), each with a reason; pins the push-guard hook and refuses keys outside its key set; reads only that file |
 | `check-docs` | Required READMEs and their Contents, relative links and anchors, lesson and rule files, the length of `AGENTS.md` (the conventions are in [docs/README.md](../docs/README.md#conventions)) |
 | `doctor` | Checks the toolchain, host tools, QEMU version, firmware and accelerator, smoke-boots each architecture's firmware (logs in `target/doctor/`), and reports the reference library; non-zero exit on any `FAIL` line |
 | `refs [--fetch]` | The reference library's state per entry (offline); `--fetch` downloads missing or changed entries over https, checks each SHA-256 and writes their text ([reference/README.md](../reference/README.md)) |

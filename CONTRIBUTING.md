@@ -74,7 +74,7 @@ These are policy, not preferences. A pull request that breaks one will not be me
 
 - Formatting (`cargo fmt`), clippy with warnings denied, docs without warnings, tests, `cargo deny`, typos.
 - **Workflows** (`check-workflows`): actions pinned to commit hashes, a read-only token (a job-level `write` scope only if it is in `WRITE_ALLOWLIST` in `xtask/src/check_workflows.rs`, with a reason), no persisted checkout credentials, no `pull_request_target`.
-- **Agent settings** (`check-settings`): `.claude/settings.json` keeps the required deny rules, the sandbox switches, read denies and credential denies, and relaxes the sandbox (exclusions, write paths, domains, Mach services) only by entries in the allowlists of `xtask/src/check_settings.rs`, each with a reason.
+- **Agent settings** (`check-settings`): `.claude/settings.json` keeps the required deny rules, the sandbox switches, read denies and credential denies, and relaxes the sandbox (exclusions, write paths, domains, Mach services) only by entries in the allowlists of `xtask/src/check_settings.rs`, each with a reason; the push-guard hook stays as committed, and a settings key the file does not already use needs an entry there too.
 - **Documentation layout** (`check-docs`): the conventions in [docs/README.md](docs/README.md#conventions).
 - **`unsafe`:** undecided until an M1 chunk replaces [ADR 0002](docs/adr/0002-unsafe-policy-undecided.md); until then no crate other than spikes uses it.
 
