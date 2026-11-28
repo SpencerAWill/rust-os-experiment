@@ -13,24 +13,27 @@
 //!    `sandbox.filesystem.allowWrite` ([`WRITE_PATH_ALLOWLIST`]), `sandbox.network.allowedDomains`
 //!    ([`DOMAIN_ALLOWLIST`]) and `sandbox.network.allowMachLookup` ([`MACH_LOOKUP_ALLOWLIST`],
 //!    empty).
-//! 5. The switches of [`FORBIDDEN_TRUE`] are not `true` (`allowLocalBinding`,
-//!    `allowAllUnixSockets`, `filesystem.disabled`, `filesystem.allowGitConfig`,
-//!    `allowAppleEvents`, `enableWeakerNestedSandbox`, `enableWeakerNetworkIsolation`,
-//!    `allowNestedUserNamespaces`, `autoAllowBashIfSandboxed`, top-level `disableAllHooks`); the
-//!    keys of [`FORBIDDEN_ANY_VALUE`] (`network.httpProxyPort`, `socksProxyPort`) are absent; the
-//!    lists of [`MUST_BE_EMPTY`] have no entry (`network.allowUnixSockets`,
+//! 5. The settings that run programs or relax the sandbox are refused: the keys of
+//!    [`TOP_LEVEL_KEYS`] and the other closed key sets are all the file may hold (any other key,
+//!    such as `proxyAuthHelper` or `enabledPlugins`, is a finding: a new key needs an entry with
+//!    its reason in this file); `hooks` equals [`expected_hooks`] exactly (the push guard stays
+//!    and no other hook is added); the switches of [`FORBIDDEN_TRUE`] are not `true`
+//!    (`allowLocalBinding`, `allowAllUnixSockets`, `filesystem.disabled`,
+//!    `filesystem.allowGitConfig`, `allowAppleEvents`, `enableWeakerNestedSandbox`,
+//!    `enableWeakerNetworkIsolation`, `allowNestedUserNamespaces`, `autoAllowBashIfSandboxed`,
+//!    `allowPty`, `enableAllProjectMcpServers`, `skipDangerousModePermissionPrompt`,
+//!    `skipAutoPermissionPrompt`, top-level `disableAllHooks`); the keys of
+//!    [`FORBIDDEN_ANY_VALUE`] are absent (`network.httpProxyPort`, `socksProxyPort`,
+//!    `network.mitmProxy`, `sandbox.seccomp`, `sandbox.mandatoryDenySearchDepth`,
+//!    `permissions.defaultMode` as a personal preference, and the top-level `env`, `statusLine`,
+//!    `apiKeyHelper`, `otelHeadersHelper`, `awsAuthRefresh`, which run programs outside the
+//!    sandbox); the lists of [`MUST_BE_EMPTY`] have no entry (`network.allowUnixSockets`,
 //!    `filesystem.allowRead`, `filesystem.allowWriteWithinDeny`, `ignoreViolations`,
-//!    `permissions.additionalDirectories`). Also `sandbox.allowPty`, `enableAllProjectMcpServers`,
-//!    `skipDangerousModePermissionPrompt` and `skipAutoPermissionPrompt` are not `true`; and
-//!    `sandbox.mandatoryDenySearchDepth`, `network.mitmProxy`, `sandbox.seccomp` and
-//!    `permissions.defaultMode` (any value, a personal preference) are absent.
+//!    `permissions.additionalDirectories`). A key a specific rule covers gets that rule's
+//!    message only.
 //! 6. `permissions.allow` has no bare tool name (`Bash`, `Read`, `Edit`, `Write`), no `Bash(*)`
 //!    and no entry starting `Edit(` or `WebFetch(domain:` ([`FORBIDDEN_ALLOW_PREFIXES`]).
 //! 7. The file is valid JSON and each field above has the right type.
-//!
-//! 8. `hooks` equals [`expected_hooks`] exactly (the push guard stays and no other hook is added),
-//!    and the top-level keys of [`FORBIDDEN_ANY_VALUE`] that run programs outside the sandbox
-//!    (`env`, `statusLine`, `apiKeyHelper`, `otelHeadersHelper`, `awsAuthRefresh`) are absent.
 //!
 //! It reads only `.claude/settings.json` (the shared file, not `settings.local.json`), writes
 //! nothing and runs no program. The repository root is the parent of this crate's directory, so
@@ -211,6 +214,73 @@ fn expected_hooks() -> Value {
     })
 }
 
+// The closed key set, one constant per object level of the shared settings, each holding exactly
+// the keys `.claude/settings.json` uses. The schema has many keys that run programs or relax the
+// sandbox (`awsCredentialExport`, `gcpAuthRefresh`, `proxyAuthHelper`, `fileSuggestion`,
+// `subagentStatusLine`, `processWrapper`, `enabledPlugins`, `extraKnownMarketplaces`, ...), and
+// refusing them one by one missed some (review round 3, log.md). Any other key is a finding: a
+// new key needs an entry here with its reason. `hooks` is pinned whole by `expected_hooks`.
+
+/// Keys allowed at the top level (`hooks`: the push guard, pinned separately).
+const TOP_LEVEL_KEYS: &[&str] = &["permissions", "sandbox", "hooks"];
+
+/// Keys allowed in `permissions`.
+const PERMISSIONS_KEYS: &[&str] = &["allow", "deny"];
+
+/// Keys allowed in `sandbox`.
+const SANDBOX_KEYS: &[&str] = &[
+    "enabled",
+    "allowUnsandboxedCommands",
+    "failIfUnavailable",
+    "excludedCommands",
+    "filesystem",
+    "network",
+    "credentials",
+];
+
+/// Keys allowed in `sandbox.filesystem`.
+const FILESYSTEM_KEYS: &[&str] = &["allowWrite", "denyRead"];
+
+/// Keys allowed in `sandbox.network`.
+const NETWORK_KEYS: &[&str] = &["allowedDomains"];
+
+/// Keys allowed in `sandbox.credentials`.
+const CREDENTIALS_KEYS: &[&str] = &["envVars"];
+
+/// Whether a specific rule (forbidden, must-be-empty or allowlist) covers the key at `path`.
+fn specifically_handled(path: &[&str]) -> bool {
+    FORBIDDEN_TRUE
+        .iter()
+        .chain(FORBIDDEN_ANY_VALUE)
+        .chain(MUST_BE_EMPTY)
+        .any(|p| *p == path)
+        || path == ["sandbox", "network", "allowMachLookup"]
+}
+
+/// A finding for each key of the object at `path` that is not in `allowed`.
+fn closed_keys(root: &Value, path: &[&str], allowed: &[&str], findings: &mut Vec<String>) {
+    let Some(Value::Object(map)) = get(root, path).or((path.is_empty()).then_some(root)) else {
+        return;
+    };
+    let name = if path.is_empty() {
+        "the top level".to_string()
+    } else {
+        path.join(".")
+    };
+    for key in map.keys().filter(|k| !allowed.contains(&k.as_str())) {
+        // A key a specific rule below already refuses is reported there, with a clearer message.
+        let mut full = path.to_vec();
+        full.push(key);
+        if specifically_handled(&full) {
+            continue;
+        }
+        findings.push(format!(
+            "{name} has the key `{key}`, which is not allowed; a new key needs an entry with its \
+             reason in xtask/src/check_settings.rs"
+        ));
+    }
+}
+
 /// Lists that must stay empty (an object counts by its keys).
 const MUST_BE_EMPTY: &[&[&str]] = &[
     &["sandbox", "network", "allowUnixSockets"],
@@ -345,6 +415,18 @@ fn check(settings: &Value) -> Vec<String> {
     }
     let mut findings = Vec::new();
     let f = &mut findings;
+
+    let levels: [(&[&str], &[&str]); 6] = [
+        (&[], TOP_LEVEL_KEYS),
+        (&["permissions"], PERMISSIONS_KEYS),
+        (&["sandbox"], SANDBOX_KEYS),
+        (&["sandbox", "filesystem"], FILESYSTEM_KEYS),
+        (&["sandbox", "network"], NETWORK_KEYS),
+        (&["sandbox", "credentials"], CREDENTIALS_KEYS),
+    ];
+    for (path, allowed) in levels {
+        closed_keys(settings, path, allowed, f);
+    }
 
     require_entries(settings, &["permissions", "deny"], REQUIRED_DENY, f);
     for entry in string_list(settings, &["permissions", "allow"], f) {
@@ -877,6 +959,38 @@ mod tests {
         ] {
             let findings = findings_after(|s| s[key] = json!({ "x": "y" }));
             assert_one(&findings, key);
+        }
+    }
+
+    #[test]
+    fn an_unknown_key_at_each_level_is_a_finding() {
+        let cases: [(&[&str], &str); 6] = [
+            (&[], "proxyAuthHelper"),
+            (&["permissions"], "ask"),
+            (&["sandbox"], "allowPty"),
+            (&["sandbox", "filesystem"], "allowRead"),
+            (&["sandbox", "network"], "mitmProxy"),
+            (&["sandbox", "credentials"], "mode"),
+        ];
+        for (path, key) in cases {
+            let findings = findings_after(|s| {
+                let mut at = &mut *s;
+                for p in path {
+                    at = &mut at[*p];
+                }
+                at[key] = json!("x");
+            });
+            assert!(
+                findings.iter().any(|f| f.contains(key)),
+                "{path:?} {key}: {findings:?}"
+            );
+            // Keys with a specific rule get that rule's message; the others the closed-set one.
+            if !["allowPty", "allowRead", "mitmProxy"].contains(&key) {
+                assert!(
+                    findings.iter().any(|f| f.contains("not allowed")),
+                    "{path:?} {key}: {findings:?}"
+                );
+            }
         }
     }
 
