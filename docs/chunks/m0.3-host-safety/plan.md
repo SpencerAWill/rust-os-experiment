@@ -93,3 +93,4 @@ From `lessons-researcher` (dispatched by agent name):
 ## 5. Deviations
 
 - Step 3 (2026-11-28): the evaluation found the spec's credential premise wrong (`log.md`); the spec was amended and approved before step 3 was committed, and steps 3, 4 and 6 above carry the amendment.
+- Stage 5 (2026-11-28): the second amendment (spec §4.1.3, §4.2.3, §4.3 item 5, §4.7, R8) added review fixes outside the steps: `xtask/src/guard_push.rs` (no step named it), the exclusions pinned to `origin`, the `settings.local.json` deny, and more `check-settings` keys; review round 2 added the hook and helper keys and recorded the planted-git-directory paths for the push-hook follow-up. `log.md`, 2026-11-28 entries from "Reviews round 1" on.

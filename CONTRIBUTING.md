@@ -65,7 +65,7 @@ Rules for QEMU commands, followed by `cargo xtask run` from M2 (no code enforces
 3. No VNC or SPICE server (`-vnc`, `-spice`); a display, when needed, is a local window (`-display cocoa` on macOS).
 4. Disk images live only under `target/`, attached with `readonly=on` or `snapshot=on` unless the guest must write.
 5. `-nic none` unless a chunk needs a network; then user-mode networking, with every `hostfwd` bound to `127.0.0.1`.
-6. No `xtask` command writes to a block device (`/dev/disk*` on macOS, `/dev/sd*` or `/dev/nvme*` on Linux); flashing real hardware stays a manual step.
+6. No `xtask` command writes to a disk device, block or raw (`/dev/disk*` and `/dev/rdisk*` on macOS; `/dev/sd*`, `/dev/nvme*` and `/dev/mmcblk*` on Linux); flashing real hardware stays a manual step.
 7. Every QEMU child has a deadline and a tag that a later run finds and kills, as `doctor`'s smoke boots do.
 
 ## What CI enforces
