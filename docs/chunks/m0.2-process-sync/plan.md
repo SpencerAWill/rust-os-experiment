@@ -31,7 +31,7 @@ This chunk runs under the loop as it was when the spec was approved, so stage 7 
 
 ### Step 3: workflow and maintainer notes (R1)
 
-- [ ] **Who:** main session
+- [x] **Who:** main session
 - **Files:** `docs/workflow.md`, `docs/maintainers.md`
 - **Test first:** `git grep -n -i 'roadmap' docs/workflow.md docs/maintainers.md` lists the places that name the roadmap as the home of order or status (workflow lines 21, 45, 49, 54, 60; maintainers lines 16, 27, 44).
 - **Change:** from the engine's versions of both files (spec §4.7). `docs/workflow.md` also gets: the three waits and the pause; one line in "Research chunks" saying research work is always a chunk, never a chore (spec §4.3); and one line on re-verify for research chunks (spec §4.8 item 4). `docs/maintainers.md`'s "Issue tracking" keeps this repository's lines (`research` issues are scheduled Project items, auto-add with no label exclusion, `needs-measurement`) and its web-UI workflows list. The views list becomes Next Up only. "When a milestone completes" drops the tracking-issue line and keeps no icebox line.
