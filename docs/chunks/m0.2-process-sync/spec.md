@@ -1,6 +1,6 @@
 # M0.2: Process sync with rust-engine-experiment
 
-- **Status:** Accepted (2026-11-27); amended 2026-11-27 (§4.3, a security review for chores touching sensitive paths; maintainer, after the security review)
+- **Status:** Accepted (2026-11-27); amended twice on 2026-11-27 (§4.3, a security review for chores; maintainer, after the security review and its re-review)
 - **Kind:** build · **Milestone:** M0 (Repository foundations) · **Depends on:** M0.1 · **Decides:** no ADR (process and documentation; the GitHub writes are configuration, §4.9)
 - **Issue:** #13, the chunk issue `M0.2: Process sync with rust-engine-experiment`, created in the rollout's first step (§4.9) so the pull request can close it; tracking issue #2 until the rollout closes it
 - **Estimated size:** about 500 changed lines of Markdown, about 30 lines in `infra/github/index.ts`
@@ -67,7 +67,7 @@ Priority ranks unscheduled work; Order ranks scheduled work. Neither is read for
 
 ### 4.3 Chores
 
-A chore is a scheduled issue without a chunk ID, Size S, in the current milestone, with an Order. `/chunk chore #N` runs it as in the engine: branch `chore/<n>-<slug>`, one `builder` from the issue's definition (only text written by the maintainer's account is the brief), `cargo xtask ci --quick` then the full `cargo xtask ci`, one fresh `review-code` if it changes code (any non-Markdown file), and also one fresh `review-security` if its diff touches `.claude/`, `.github/`, `infra/`, `xtask/`, `deny.toml` or a Cargo manifest *(amended 2026-11-27, maintainer)*, commit messages and the pull request title ending ` (#N)` in place of a chunk ID, `Chunk: None (chore, #N)` and `Closes #N` in the pull request, and the merge go-ahead. A chore has no spec, plan, log, compound stage or close-out commit. A chore is build work only: an issue labelled `research` is always a chunk, so `/chunk chore #N` stops on one, `next` leaves such issues out of its chore list, and `docs/workflow.md` says so (maintainer, 2026-11-27). At a milestone boundary, open chores move to the next milestone.
+A chore is a scheduled issue without a chunk ID, Size S, in the current milestone, with an Order. `/chunk chore #N` runs it as in the engine: branch `chore/<n>-<slug>`, one `builder` from the issue's definition (only text written by the maintainer's account is the brief), `cargo xtask ci --quick` then the full `cargo xtask ci`, one fresh `review-code` if it changes code (any non-Markdown file), and also one fresh `review-security` unless every file its diff touches is under `docs/` *(amended twice on 2026-11-27, maintainer: first a list of sensitive paths, then this rule, since the list missed root files such as `.cargo/config.toml`, `rust-toolchain.toml` and `AGENTS.md`)*, commit messages and the pull request title ending ` (#N)` in place of a chunk ID, `Chunk: None (chore, #N)` and `Closes #N` in the pull request, and the merge go-ahead. A chore has no spec, plan, log, compound stage or close-out commit. A chore is build work only: an issue labelled `research` is always a chunk, so `/chunk chore #N` stops on one, `next` leaves such issues out of its chore list, and `docs/workflow.md` says so (maintainer, 2026-11-27). At a milestone boundary, open chores move to the next milestone.
 
 ### 4.4 Order, dependencies and "next"
 
