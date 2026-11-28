@@ -85,7 +85,7 @@ This chunk runs under the loop as it was when the spec was approved, so stage 7 
 
 ### Step 9: skill trial, grep evidence and changelog (R3, R8, R10; tooling-7, specs-2)
 
-- [ ] **Who:** main session; a fresh `general-purpose` agent (read-only) for the trial
+- [x] **Who:** main session; a fresh `general-purpose` agent (read-only) for the trial
 - **Files:** `CHANGELOG.md`, `log.md`
 - **Test first:** `CHANGELOG.md` has no M0.2 entry.
 - **Change:** a trial agent follows the new `next` section read-only against GitHub as it is now (no milestones yet), with only the skill's own rules, and reports what it had to guess. Gaps it finds are fixed in the skill and committed here. Then record R3's grep (`git grep -n -i roadmap .claude/`) and R8's grep and `git diff --stat main...HEAD` in `log.md`, check each of spec §4.8's seven items against its file (R10), and add a "Changed" entry to `CHANGELOG.md`.
