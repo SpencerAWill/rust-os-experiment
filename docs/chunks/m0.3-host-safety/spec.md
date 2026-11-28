@@ -1,6 +1,6 @@
 # M0.3: Host-safety guardrails for agents and later QEMU commands
 
-- **Status:** Draft (2026-11-27).
+- **Status:** Accepted (2026-11-27).
 - **Kind:** build · **Milestone:** M0 (repository foundations) · **Depends on:** M0.1 · **Decides:** no ADR
 - **Issue:** #10
 - **Estimated size:** about 550 changed lines, excluding tests, lockfiles and generated files (settings about 80, `check-settings` about 300, documents about 170)
