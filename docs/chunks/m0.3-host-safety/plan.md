@@ -20,7 +20,7 @@ The manual checks come first, in the order the sandbox would otherwise get in th
 
 ### Step 2: deny rules (R2, R3)
 
-- [ ] **Who:** main session (configuration).
+- [x] **Who:** main session (configuration).
 - **Files:** `.claude/settings.json`, `log.md`.
 - **Test first:** `jq '.permissions.deny' .claude/settings.json` prints `null`.
 - **Change:** add `permissions.deny` with every rule of spec §4.2, in the spec's order: the Bash rules as `Bash(<command> *)`, the Read rules as `Read(<path>)`.
