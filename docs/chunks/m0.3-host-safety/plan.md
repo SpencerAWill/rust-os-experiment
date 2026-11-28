@@ -11,7 +11,7 @@ The manual checks come first, in the order the sandbox would otherwise get in th
 
 ### Step 1: check the gdb stub binding (R7)
 
-- [ ] **Who:** main session.
+- [x] **Who:** main session.
 - **Files:** `docs/chunks/m0.3-host-safety/log.md`.
 - **Test first:** the claim is the test: `-s` is expected to listen on `*:1234`. If it shows `127.0.0.1:1234`, spec §4.4.1's reason is wrong and the rule's wording is amended before step 5.
 - **Change:** run `qemu-system-x86_64 -S -s -nographic -monitor none -nic none -name xtask-m0.3-probe` in the background, poll `lsof -nP -iTCP:1234 -sTCP:LISTEN` until it prints a line (at most 10 s), record it, kill the QEMU by pid and check with `pgrep -f xtask-m0.3-probe` that nothing is left. Repeat with `-gdb tcp:127.0.0.1:1234` in place of `-s`. Before the first run, `lsof -nP -iTCP:1234 -sTCP:LISTEN` prints nothing (no other listener). If macOS shows a firewall prompt, decline it and log that.
