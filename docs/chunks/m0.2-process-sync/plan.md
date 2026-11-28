@@ -13,7 +13,7 @@ This chunk runs under the loop as it was when the spec was approved, so stage 7 
 
 ### Step 1: chunk issue and Order field (R11, items 1 and 2)
 
-- [ ] **Who:** main session
+- [x] **Who:** main session
 - **Files:** `docs/chunks/m0.2-process-sync/spec.md` (the `**Issue:**` line), `log.md`
 - **Test first:** `gh project field-list 8 --owner SpencerAWill --format json` lists no `Order` field, and `gh issue list --state all --limit 1000 --search 'M0.2 in:title'` lists no issue.
 - **Change:** open the chunk issue `M0.2: Process sync with rust-engine-experiment`, with the Definition of Ready headings and the `ai-assisted` label (and `infrastructure`). Add it to Project 8 and set its Status to Scheduled. Create the `Order` number field and set Order 10 on the issue. Write the issue number into the spec header.

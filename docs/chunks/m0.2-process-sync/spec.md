@@ -2,7 +2,7 @@
 
 - **Status:** Accepted (2026-11-27)
 - **Kind:** build · **Milestone:** M0 (Repository foundations) · **Depends on:** M0.1 · **Decides:** no ADR (process and documentation; the GitHub writes are configuration, §4.9)
-- **Issue:** the chunk issue `M0.2: Process sync with rust-engine-experiment`, created in the rollout's first step (§4.9) so the pull request can close it; tracking issue #2 until the rollout closes it
+- **Issue:** #13, the chunk issue `M0.2: Process sync with rust-engine-experiment`, created in the rollout's first step (§4.9) so the pull request can close it; tracking issue #2 until the rollout closes it
 - **Estimated size:** about 500 changed lines of Markdown, about 30 lines in `infra/github/index.ts`
 
 Requirement keywords (MUST, MUST NOT, SHOULD, MAY) follow [RFC 2119](https://www.rfc-editor.org/rfc/rfc2119) as clarified by [RFC 8174](https://www.rfc-editor.org/rfc/rfc8174): they are normative only in uppercase.
