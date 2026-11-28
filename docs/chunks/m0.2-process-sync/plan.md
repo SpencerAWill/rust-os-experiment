@@ -58,7 +58,7 @@ This chunk runs under the loop as it was when the spec was approved, so stage 7 
 
 ### Step 6: entry documents and templates (R4, R8, R9; spec §4.8 item 6)
 
-- [ ] **Who:** main session
+- [x] **Who:** main session
 - **Files:** `AGENTS.md`, `CONTRIBUTING.md`, `README.md`, `docs/README.md`, `docs/chunks/README.md`, `.claude/README.md`, `docs/research/open-questions.md`, `.github/PULL_REQUEST_TEMPLATE.md`, `.github/ISSUE_TEMPLATE/feature_request.yml`, `.github/ISSUE_TEMPLATE/infrastructure.yml`, `docs/chunks/_template/spec.md`, `docs/chunks/_template/plan.md`
 - **Test first:** `git grep -n -i roadmap` over these files lists their mentions of the roadmap as the home of planned work; `grep -c 'chore' AGENTS.md` prints 0.
 - **Change:** from the engine's versions (spec §4.7). `AGENTS.md` keeps research chunks and the `researcher` role. The spec template's `**Issue:**` line is required. The PR template names chores and `Closes #N`. The plan template's Deviations comment follows the engine's.

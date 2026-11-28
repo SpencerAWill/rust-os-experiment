@@ -1,6 +1,6 @@
 # Open questions
 
-Status: Reference: not a decision (2026-11-17). The questions M1 answers, most blocking first. Each maps to a research chunk on the [roadmap](../roadmap.md).
+Status: Reference: not a decision (2026-11-17). The questions M1 answers, most blocking first. Each maps to a research chunk, a chunk issue in the [M1 milestone](https://github.com/SpencerAWill/rust-os-experiment/milestones) (goals in the [roadmap](../roadmap.md)).
 
 | # | Question | Blocks | Chunk |
 |---|---|---|---|

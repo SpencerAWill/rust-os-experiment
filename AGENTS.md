@@ -1,6 +1,6 @@
 # Guide for AI coding assistants
 
-Read this first. The rules are in [CONTRIBUTING.md](CONTRIBUTING.md), the workflow in [docs/workflow.md](docs/workflow.md), and what is planned in [docs/roadmap.md](docs/roadmap.md).
+Read this first. The rules are in [CONTRIBUTING.md](CONTRIBUTING.md), the workflow in [docs/workflow.md](docs/workflow.md), and what is planned on GitHub (chunk issues, milestones and the "OS backlog" Project; [docs/workflow.md](docs/workflow.md#from-issue-to-chunk)), with milestone goals in [docs/roadmap.md](docs/roadmap.md).
 
 ## Commands
 
@@ -23,9 +23,9 @@ The other commands are in [xtask/README.md](xtask/README.md).
 
 ## The loop
 
-Work is done in chunks from the roadmap, each through seven stages: brainstorm, grill, plan, work, review, compound, close out ([docs/workflow.md](docs/workflow.md)). A chunk is of **kind** `build` or `research`; research chunks differ in stages 4 and 5. In Claude Code, `/chunk next` starts one and `/chunk resume` continues one.
+Work is done in chunks, each one GitHub issue scheduled in a milestone, each through seven stages: brainstorm, grill, plan, work, review, compound, close out ([docs/workflow.md](docs/workflow.md)). A chunk is of **kind** `build` or `research`; research chunks differ in stages 4 and 5. In Claude Code, `/chunk next` starts the next scheduled one, `/chunk resume` continues one, and `/chunk chore #N` runs a small scheduled chore (build work only) without the stages.
 
-- **Wait for the maintainer only twice:** spec approval (at the end of the grill) and the merge go-ahead. Between them, move to the next stage without asking.
+- **Wait for the maintainer only three times:** spec approval (at the end of the grill), a pause after the plan commit (to clear the context, [docs/workflow.md](docs/workflow.md#the-loop)), and the merge go-ahead. Between them, move to the next stage without asking.
 - **Roles.** The main session writes documents, dispatches agents (`.claude/agents/`) and commits. A `builder` (Sonnet) writes product and test code; a `researcher` writes research documents with citations; independent reviewers check the work and never see the author's reasoning.
 - **Stop and ask** when:
   - the spec is wrong or silent on something that changes what gets built;
@@ -42,7 +42,7 @@ Work is done in chunks from the roadmap, each through seven stages: brainstorm, 
 - **Test first.** For a bug fix, write the test, watch it fail for the reason you expect, then fix the code. Never weaken or delete a failing test without saying so.
 - **Verify before claiming.** Run the command and read its output; do not infer success from the diff. In research, a claim needs a cited source or a command that was run.
 - **Specifications**: check a claim against `reference/text/` first, then the publisher's site, then write it as unverified; cite the document id, version and section ([reference/README.md](reference/README.md#citing-a-specification)).
-- **Small logical commits**, conventional messages ending with the chunk ID, files staged by explicit path. Say in the pull request that an assistant was used.
+- **Small logical commits**, conventional messages ending with the chunk ID (for a chore, ` (#N)`, its issue number), files staged by explicit path. Say in the pull request that an assistant was used.
 - **Report honestly**: a failed test, a skipped step or an unverified claim is said, with the evidence.
 - **Issues**: the path from issue to chunk and the Definition of Ready are in [docs/workflow.md](docs/workflow.md#from-issue-to-chunk); `/triage` defines issues without building anything.
 - **Docs**: new documents get a status line; hard-to-reverse decisions get an ADR; spec section numbers stay stable; write the minimum and link instead of copying.

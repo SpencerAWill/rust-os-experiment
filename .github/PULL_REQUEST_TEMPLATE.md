@@ -1,6 +1,6 @@
 ## Chunk
 
-<!-- Roadmap work: the chunk ID, its kind (build or research) and links (see docs/roadmap.md). Otherwise "None", for example for a dependency update or a small fix. The title ends with the chunk ID, for example "(M1.1)". -->
+<!-- A chunk: its ID, its kind (build or research), its issue ("Closes #N") and links. A chore: "None (chore, #N)" and "Closes #N". Otherwise "None", for example for a dependency update. The title ends with the chunk ID, for example "(M1.1)", or for a chore with its issue number, "(#42)". -->
 
 - Chunk:
 - Kind:
@@ -49,4 +49,4 @@ Research chunk:
 - [ ] No code was copied from another project or from an AI research conversation (ADR 0001). If an AI assistant was used, I say so here.
 - [ ] Every factual claim in a research note has a source, or is marked unverified.
 - [ ] User-visible changes are in `CHANGELOG.md`.
-- [ ] For a chunk: the spec is `Implemented`, the plan and log are `Historical` with the plan's Deviations filled in, and the roadmap row is `Done`.
+- [ ] For a chunk: the spec is `Implemented`, the plan and log are `Historical` with the plan's Deviations filled in, and the description says `Closes #<chunk issue>`.
