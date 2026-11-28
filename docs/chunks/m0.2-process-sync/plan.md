@@ -76,7 +76,7 @@ This chunk runs under the loop as it was when the spec was approved, so stage 7 
 
 ### Step 8: lessons (spec §4.8 item 7)
 
-- [ ] **Who:** main session
+- [x] **Who:** main session
 - **Files:** `docs/lessons/README.md`, `docs/lessons/docs.md`, `docs/lessons/specs.md`, `docs/lessons/tooling.md`, `docs/lessons/infra.md` (new)
 - **Test first:** `grep -c -E '\*\*(docs-4|specs-5|specs-6|tooling-11|tooling-12|infra-1)\.\*\*' docs/lessons/*.md` totals 0.
 - **Change:** the six lessons, rewritten for this repository, each *From* naming the engine chunk. docs-1 gains the engine's general addition; specs-4's rule covers measured-code changes. The status dates become 2026-11-27. The README lists `infra.md`.
