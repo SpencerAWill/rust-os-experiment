@@ -1,6 +1,6 @@
 # M0.3: Host-safety guardrails for agents and later QEMU commands
 
-- **Status:** Accepted (2026-11-27); amendment of 2026-11-28 (gh and git push credentials, the `doctor` sweep: §2, §3, §4.1.2 to §4.1.5, §4.2.3, §4.3, §4.5, §4.6, §5 R2 and R3, §6, §8) in grill.
+- **Status:** Accepted (2026-11-27); amended 2026-11-28 (gh and git push credentials, the `doctor` sweep: §2, §3, §4.1.2 to §4.1.5, §4.2.3, §4.3, §4.5, §4.6, §5 R2 and R3, §6, §8).
 - **Kind:** build · **Milestone:** M0 (repository foundations) · **Depends on:** M0.1 · **Decides:** no ADR
 - **Issue:** #10
 - **Estimated size:** about 550 changed lines, excluding tests, lockfiles and generated files (settings about 80, `check-settings` about 300, documents about 170)

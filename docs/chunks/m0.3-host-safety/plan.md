@@ -1,6 +1,6 @@
 # M0.3 plan: Host-safety guardrails for agents and later QEMU commands
 
-- **Status:** Accepted (2026-11-27).
+- **Status:** Accepted (2026-11-27); amended 2026-11-28 with the spec (steps 3, 4, 6; Deviations).
 - **Spec:** [spec.md](spec.md). This plan argues from the spec; read both. Progress and surprises go in [log.md](log.md).
 
 ## 1. Approach
@@ -29,10 +29,11 @@ The manual checks come first, in the order the sandbox would otherwise get in th
 
 ### Step 3: the sandbox and its evaluation (R1, R4)
 
-- [ ] **Who:** main session (configuration and the evaluation).
+- [x] **Who:** main session (configuration and the evaluation).
 - **Files:** `.claude/settings.json`, `log.md`.
 - **Test first:** `touch ~/m0.3-sandbox-probe && rm ~/m0.3-sandbox-probe` succeeds (no sandbox yet); logged. Record `time cargo xtask ci` unsandboxed.
 - **Change:** add the `sandbox` object of spec §4.1 with `allowWrite`, `excludedCommands` and `allowedDomains` empty, the `denyRead` paths of §4.1.5 and the credential denies of §4.1.6. Then, after `/sandbox` (or the first sandboxed Bash call) shows the sandbox is active, run spec §8's evaluation commands one at a time (`cargo xtask ci`, `cargo xtask doctor`, `gh issue view 10`, `gh project item-list 8 --owner SpencerAWill --limit 1000 --format json`, `git fetch`, `git push` of the chunk branch). For each failure, log the error, add the narrowest entry that fixes it in the order of spec §4.1.3 (write path, domain, `allowMachLookup` service, then exclusion), and re-run. Check each key against `claude`'s behaviour; a key honoured only from user settings is handled as spec §4.1.1 says. If the loop cannot run, take the fallback of spec §4.1.7 instead and stop this step there.
+- *Amendment of 2026-11-28:* also the Edit denies of spec §4.2.3 in `permissions.deny`, the exclusions and `denyRead` of the amended §4.1.3 and §4.1.5, `allowedDomains` `github.com`, no `allowMachLookup`; the evaluation is re-run with them, and a Write of `.git/hooks/m0.3-edit-probe` is refused (R3).
 - **Verify:** every evaluation command passes in this session, the `touch` probe fails with a sandbox error, and `time cargo xtask ci` sandboxed is logged next to the unsandboxed time; `log.md` lists every entry added and why.
 - **Commit:** `feat(claude): turn on the Claude Code sandbox for this repository (M0.3)`
 
@@ -42,7 +43,7 @@ The manual checks come first, in the order the sandbox would otherwise get in th
 - **Files:** `xtask/src/check_settings.rs` (new), `xtask/src/main.rs`.
 - **Test first:** in `check_settings.rs`, the unit tests of spec §8 R5 against small JSON values built in the test, plus one that runs the check on the committed file (`include_str!("../../.claude/settings.json")`); they fail because `check` is a `todo!()`. Then the `ci_steps_are_the_ported_set` test in `main.rs` with `Command::CheckSettings` after `Command::CheckWorkflows`, which fails until `ci_steps` changes.
 - **Change:**
-  - `check_settings.rs`, with a module doc like `check_workflows.rs`'s listing the rules of spec §4.3: `pub(crate) fn run() -> Result<(), String>` reads `.claude/settings.json` from the repository root, taken as the parent of `env!("CARGO_MANIFEST_DIR")` (not `git rev-parse`, since spec §4.3 says the check runs no other program; see Lessons, xtask-1), prints each finding on its own line and fails with the count; `fn check(settings: &serde_json::Value) -> Vec<String>` returns one message per finding, every finding listed (no early return). Constants, each entry with a reason comment for the three allowlists: `REQUIRED_DENY`, `REQUIRED_DENY_READ`, `REQUIRED_CREDENTIAL_DENY`, `EXCLUDED_ALLOWLIST`, `WRITE_PATH_ALLOWLIST`, `DOMAIN_ALLOWLIST`, holding exactly what step 3 committed. If step 3 took the fallback, the sandbox items (spec §4.3 items 2 to 5) are not written.
+  - `check_settings.rs`, with a module doc like `check_workflows.rs`'s listing the rules of spec §4.3: `pub(crate) fn run() -> Result<(), String>` reads `.claude/settings.json` from the repository root, taken as the parent of `env!("CARGO_MANIFEST_DIR")` (not `git rev-parse`, since spec §4.3 says the check runs no other program; see Lessons, xtask-1), prints each finding on its own line and fails with the count; `fn check(settings: &serde_json::Value) -> Vec<String>` returns one message per finding, every finding listed (no early return). Constants, each entry with a reason comment for the three allowlists: `REQUIRED_DENY`, `REQUIRED_DENY_READ`, `REQUIRED_CREDENTIAL_DENY`, `EXCLUDED_ALLOWLIST`, `WRITE_PATH_ALLOWLIST`, `DOMAIN_ALLOWLIST` and (amendment of 2026-11-28) `MACH_LOOKUP_ALLOWLIST` (empty: any entry is a finding), holding exactly what step 3 committed. If step 3 took the fallback, the sandbox items (spec §4.3 items 2 to 5) are not written.
   - `main.rs`: `Command::CheckSettings`, parsed from `check-settings` with no flags, run after `CheckWorkflows` in the full `ci_steps`.
 - **Tests that must reach their branch (xtask-6):** an allowlisted `~/.cargo` with `~` and `~/.cargo/..` in the file (exact match, not prefix); a `Bash(sudo:*)` entry does not satisfy `Bash(sudo *)` (exact strings); a credential deny with the right name and mode `mask`; a domain `*.github.com` against an allowlisted `github.com`; a CRLF copy of the committed file passes like the LF one (xtask-2). Each test is checked against one mutation of the branch it names (the builder reports which).
 - **Verify:** `cargo xtask test` passes; `cargo xtask check-settings` prints no finding and exits 0; with one required deny rule removed from a scratch copy given to the test, the finding names it (covered by the unit test).
@@ -62,7 +63,7 @@ The manual checks come first, in the order the sandbox would otherwise get in th
 - [ ] **Who:** main session.
 - **Files:** `CONTRIBUTING.md`, `.claude/README.md`, `xtask/README.md`, `AGENTS.md`, `CHANGELOG.md`.
 - **Test first:** `grep -c '^## Host safety' CONTRIBUTING.md` prints 0.
-- **Change:** CONTRIBUTING "Host safety" after "Setting up" (spec §4.4, §4.5) and `check-settings` in "What CI enforces"; `.claude/README.md` (spec §4.6), with the settings from step 3 and their reasons, and `settings.json`'s Contents line updated; the `check-settings` row in `xtask/README.md`'s command table and `check_settings.rs` in its `src/` line; one line under "Rules that fail CI" in `AGENTS.md`; an M0.3 line at the top of `CHANGELOG.md`'s Unreleased list.
+- **Change:** CONTRIBUTING "Host safety" after "Setting up" (spec §4.4, §4.5, with the `! cargo xtask doctor` sweep) and `check-settings` in "What CI enforces"; `.claude/README.md` (spec §4.6), with the settings from step 3 and their reasons, and `settings.json`'s Contents line updated; the `check-settings` row in `xtask/README.md`'s command table and `check_settings.rs` in its `src/` line; one line under "Rules that fail CI" in `AGENTS.md` and (amendment of 2026-11-28) one saying an excluded command (`gh`, `git push`) runs alone in its Bash call; an M0.3 line at the top of `CHANGELOG.md`'s Unreleased list.
 - **Verify:** `cargo xtask check-docs` reports 0 problems; `wc -l AGENTS.md` under 80; `cargo xtask typos` passes.
 - **Commit:** `docs: host-safety rules and the agent sandbox (M0.3)`
 
@@ -91,4 +92,4 @@ From `lessons-researcher` (dispatched by agent name):
 
 ## 5. Deviations
 
-None.
+- Step 3 (2026-11-28): the evaluation found the spec's credential premise wrong (`log.md`); the spec was amended and approved before step 3 was committed, and steps 3, 4 and 6 above carry the amendment.
