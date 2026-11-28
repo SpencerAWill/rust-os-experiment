@@ -10,7 +10,7 @@ Status: Living (2026-11-28). The task runner: `cargo xtask <command>` is the sin
 ## Contents
 
 - `Cargo.toml`: the `xtask` package (not published).
-- `src/`: `main.rs` parses the command line and holds the `ci` steps; `cmd.rs` runs external tools; `check_docs.rs` (and `check_docs/`), `check_workflows.rs`, `check_settings.rs` and `guard_push.rs` are the checks, ported from `rust-engine-experiment`; `doctor.rs` (and `doctor/`) and `refs.rs` check and set up the host.
+- `src/`: `main.rs` parses the command line and holds the `ci` steps; `cmd.rs` runs external tools; `check_docs.rs` (and `check_docs/`), `check_workflows.rs` and `guard_push.rs` are the checks ported from `rust-engine-experiment`, and `check_settings.rs` (M0.3) checks the agent settings; `doctor.rs` (and `doctor/`) and `refs.rs` check and set up the host.
 
 ## Commands
 

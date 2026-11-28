@@ -62,10 +62,10 @@ Rules for QEMU commands, followed by `cargo xtask run` from M2 (no code enforces
 
 1. The gdb stub listens on loopback only: `-gdb tcp:127.0.0.1:<port>`, never `-s`, which listens on every interface (checked with `lsof`, [M0.3 log](docs/chunks/m0.3-host-safety/log.md)).
 2. QMP and the monitor are Unix sockets under `target/`, or `-monitor none`; no TCP monitor.
-3. No VNC or SPICE server (`-vnc`, `-spice`); a display, when needed, is a local window (`-display cocoa`).
+3. No VNC or SPICE server (`-vnc`, `-spice`); a display, when needed, is a local window (`-display cocoa` on macOS).
 4. Disk images live only under `target/`, attached with `readonly=on` or `snapshot=on` unless the guest must write.
 5. `-nic none` unless a chunk needs a network; then user-mode networking, with every `hostfwd` bound to `127.0.0.1`.
-6. No `xtask` command writes to a block device (`/dev/disk*`, `/dev/rdisk*`); flashing real hardware stays a manual step.
+6. No `xtask` command writes to a block device (`/dev/disk*` on macOS, `/dev/sd*` or `/dev/nvme*` on Linux); flashing real hardware stays a manual step.
 7. Every QEMU child has a deadline and a tag that a later run finds and kills, as `doctor`'s smoke boots do.
 
 ## What CI enforces
