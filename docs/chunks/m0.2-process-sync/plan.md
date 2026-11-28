@@ -67,7 +67,7 @@ This chunk runs under the loop as it was when the spec was approved, so stage 7 
 
 ### Step 7: roadmap (R7)
 
-- [ ] **Who:** main session
+- [x] **Who:** main session
 - **Files:** `docs/roadmap.md`
 - **Test first:** the file has the M1 table, a Status column in the milestone table, and M0 exit criteria without M0.2 to M0.4.
 - **Change:** as spec §4.6. The M0.2 row reads `In progress` until close-out.
