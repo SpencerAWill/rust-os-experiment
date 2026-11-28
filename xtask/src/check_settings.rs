@@ -262,40 +262,31 @@ fn check(settings: &Value) -> Vec<String> {
     );
     check_credentials(settings, f);
 
-    allow_only(
-        settings,
-        &["sandbox", "excludedCommands"],
-        EXCLUDED_ALLOWLIST,
-        f,
-    );
-    allow_only(
-        settings,
-        &["sandbox", "filesystem", "allowWrite"],
-        WRITE_PATH_ALLOWLIST,
-        f,
-    );
-    allow_only(
-        settings,
-        &["sandbox", "network", "allowedDomains"],
-        DOMAIN_ALLOWLIST,
-        f,
-    );
-    allow_only(
-        settings,
-        &["sandbox", "network", "allowMachLookup"],
-        MACH_LOOKUP_ALLOWLIST,
-        f,
-    );
+    let allowlists: [(&[&str], &[&str]); 4] = [
+        (&["sandbox", "excludedCommands"], EXCLUDED_ALLOWLIST),
+        (
+            &["sandbox", "filesystem", "allowWrite"],
+            WRITE_PATH_ALLOWLIST,
+        ),
+        (&["sandbox", "network", "allowedDomains"], DOMAIN_ALLOWLIST),
+        (
+            &["sandbox", "network", "allowMachLookup"],
+            MACH_LOOKUP_ALLOWLIST,
+        ),
+    ];
+    for (path, allowed) in allowlists {
+        allow_only(settings, path, allowed, f);
+    }
 
     forbid_true(settings, &["sandbox", "network", "allowLocalBinding"], f);
     forbid_true(settings, &["sandbox", "network", "allowAllUnixSockets"], f);
-    allow_only(
-        settings,
-        &["sandbox", "network", "allowUnixSockets"],
-        &[],
-        f,
-    );
-    allow_only(settings, &["sandbox", "filesystem", "allowRead"], &[], f);
+    // Lists that must stay empty.
+    for path in [
+        &["sandbox", "network", "allowUnixSockets"][..],
+        &["sandbox", "filesystem", "allowRead"],
+    ] {
+        allow_only(settings, path, &[], f);
+    }
 
     findings
 }
