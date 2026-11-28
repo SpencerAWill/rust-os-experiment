@@ -80,14 +80,14 @@ A chore is a scheduled issue without a chunk ID, Size S, in the current mileston
 
 ### 4.5 Milestones in Pulumi
 
-`infra/github/index.ts` declares one `github.RepositoryMilestone` for each of M0 to M5: title `M<N>`, description the goal from the roadmap's milestone table plus the link to `docs/roadmap.md#milestones`, state `open`, with `ignoreChanges: ["state"]` and `retainOnDelete: true`, and a comment saying never to remove an entry (infra-1). Closing a milestone at its boundary is a `gh api --method PATCH` call in the `docs/maintainers.md` checklist, not a change to `index.ts`. `infra/github/README.md` documents the milestones as the engine's does.
+`infra/github/index.ts` declares one `github.RepositoryMilestone` for each of M0 to M5: title `M<N>`, description the goal from the roadmap's milestone table plus the absolute link `https://github.com/SpencerAWill/rust-os-experiment/blob/main/docs/roadmap.md#milestones` *(main session's call)*, state `open`, with `ignoreChanges: ["state"]` and `retainOnDelete: true`, and a comment saying never to remove an entry (infra-1). Closing a milestone at its boundary is a `gh api --method PATCH` call in the `docs/maintainers.md` checklist, not a change to `index.ts`. `infra/github/README.md` documents the milestones as the engine's does.
 
 ### 4.6 The roadmap file
 
 `docs/roadmap.md` keeps:
 
 - its introduction, rewritten to say what moved to GitHub;
-- the milestone table with goals and exit criteria, its Status column replaced by a line pointing to the GitHub milestones;
+- the milestone table with goals and exit criteria, its Status column replaced by a line pointing to the GitHub milestones. M0's exit criteria gain the three chunks it now holds: the process matches the engine's (M0.2), the host-safety guardrails are in (M0.3), and `cargo xtask spike` runs a spike (M0.4), before `/chunk next` starts M1.1 *(main session's call: the agreed sequence put them in M0)*;
 - the M0 table, frozen as history up to M0.2, whose row becomes `Done (PR #n)` at close-out;
 - the "Later milestones" table, whose rough lists become chunk issues when a milestone becomes current.
 
@@ -111,7 +111,7 @@ From the engine's commits after M3.20, each adapted to this repository's files:
 1. **Plan pause** (engine #136, #138): stage 3 step 6 and the third wait in `SKILL.md`, `AGENTS.md` and `docs/workflow.md`.
 2. **Builder** (`.claude/agents/builder.md`): never remove or relax a CI-enforced attribute or setting (`#![forbid(unsafe_code)]`, a `deny` or `forbid` lint, `deny.toml`), not even temporarily; put the first lines of the failing test run in the report; the shell rules (no command that waits on stdin; the Write and Edit tools, not `sed -i`; long commands redirected to a scratchpad file; no shell left running).
 3. **Simplify** (stage 5 step 1): read every changed source file in full, and send back a report that skipped any; re-run one red check per helper if tests moved into a shared helper.
-4. **Re-verify** (stage 5, a new step before the log step): the full `cargo xtask ci` on the final code commit after the last fix, and the chunk's measurements re-run on it or the pull request says which commit each ran on.
+4. **Re-verify** (stage 5, a new step before the log step): the full `cargo xtask ci` on the final code commit after the last fix, and the chunk's measurements re-run on it or the pull request says which commit each ran on. It applies to research chunks too (stage 5 step 0 continues from step 3): a spike run cited in the note ("measured here: <command>") is re-run if its spike's code changed after the run, and the note's citation then points at the new `log.md` entry; otherwise the pull request names the commit each cited run was on. The research section of `docs/workflow.md` says so in one line *(main session's call)*.
 5. **Grill API check** (`.claude/skills/grill/SKILL.md`): if the document declares Rust API, compile it as a stub crate in the scratchpad on the pinned toolchain and check it against the Rust API Guidelines; each break is a question.
 6. **Plan template**: the Deviations comment says one line each, with the story in `log.md`.
 7. **Lessons**, rewritten for this repository where the engine's text names engine code: engine docs-4, tooling-11, tooling-12 and infra-1 keep their IDs (`docs/lessons/infra.md` is new, `applies_to: infra/github/**`); engine specs-6 and specs-7 become specs-5 and specs-6 here, the next free IDs, since this repository has no specs-5 *(my call)*. docs-1 gains the engine's general addition (grep a moved rule's key phrase across `docs/` and `.claude/`), and specs-4's rule covers measured-code changes as well as library changes. Each ported lesson's *From* names the engine chunk (for example "engine M3.20"). `docs/lessons/README.md` lists the new file and topics.
@@ -127,10 +127,10 @@ These writes change GitHub, not the repository. Each is read back and recorded i
 
 **During the merge wait, after the pull request and its close-out commit are pushed:** the maintainer runs `pulumi preview` then `pulumi up` in `infra/github` from the branch (milestones exist from then on). Then the main session:
 
-3. Gives #3 to #8 milestone M1 and Orders 10 to 60 in table order (M1.1 to M1.6), and these "blocked by" links from the M1 table's Depends-on column: #5 by #4; #6 by #3; #7 by #3 and #6; #8 by #3 and #4. It first checks that each issue's title and body carry its row's title and dependencies, and adds anything missing to the issue body.
+3. Gives #3 to #8 milestone M1 and Orders 10 to 60 in table order (M1.1 to M1.6), and these "blocked by" links from the M1 table's Depends-on column: #5 by #4; #6 by #3; #7 by #3 and #6; #8 by #3 and #4. It first checks that each issue's body carries its row's title and dependencies, and adds anything missing to the body; no issue is retitled, since the issue titles are the questions and the row titles their topics *(main session's call)*.
 4. Retitles #10 `M0.3: Host-safety guardrails for agents and later QEMU commands` and #12 `M0.4: A runner for spikes (cargo xtask spike)`; gives both milestone M0, Status Scheduled and Orders 20 and 30; and links #12 blocked by #10 (#12's body says #10 lands first).
 5. Gives the M0.2 chunk issue milestone M0.
-6. Closes #2 as completed, with a comment that milestones replace it.
+6. Closes #2 as completed, with a comment that milestone M1 replaces it. Its sub-issue links to #3 to #8 stay, as a record, as the engine kept #66's *(main session's call)*.
 7. Asks the maintainer to create the Next Up view in the browser (views are not settable through `gh`), then confirms it is listed.
 8. Runs `/chunk next`'s selection (§4.4) by hand, as a dry run, and records the result.
 

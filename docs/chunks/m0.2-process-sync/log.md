@@ -11,3 +11,5 @@ Tags: done, decision, surprise, dead-end, lesson? (a candidate lesson for stage 
 - 2026-11-27 decision Maintainer: one chunk for the whole sync (planning on GitHub and the later process changes), one rollout.
 - 2026-11-27 decision Maintainer: `docs/maintainers.md` requires one Project view, Next Up (Status Scheduled, sorted by Order, grouped by milestone); other views optional.
 - 2026-11-27 done Draft spec written; typos and check-docs pass on it.
+- 2026-11-27 done gh 2.102.0 has `issue edit --add-blocked-by`, `project field-create --data-type NUMBER` and `issue close --duplicate-of` (checked with --help).
+- 2026-11-27 decision Grill round 1, cold read by `spec-reader` (dispatched by agent name). Main session's calls: absolute roadmap link in milestone descriptions; M0's exit criteria gain M0.2 to M0.4; re-verify applies to research chunks (cited spike runs re-run if their code changed, otherwise the PR names their commit); #3 to #8 get body additions only, no retitle; #2's sub-issue links stay when it closes. Asked the maintainer: whether research issues may be chores.
