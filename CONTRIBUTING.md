@@ -48,12 +48,33 @@ cargo xtask ci --quick      # fmt check, clippy, and tests only
 
 `cargo xtask` prints an install hint when a tool is missing. The extra tools are `cargo-nextest`, `cargo-deny` and `typos-cli`.
 
+## Host safety
+
+This repository is developed on one machine that also holds other work, so commands run here are kept from damaging it.
+
+- **Agents** run under Claude Code's sandbox and deny rules, set in `.claude/settings.json` and kept in place by `check-settings` (below). Both are guardrails for the usual form of a command, not a security boundary; what each covers and does not is in [.claude/README.md](.claude/README.md#sandbox-and-deny-rules).
+- **Homebrew** is shared with other projects. Run `brew bundle --no-upgrade` if you do not want `brew bundle` to upgrade formulae they use. Agents cannot change Homebrew's state.
+- **Long jobs** (fuzzing, mutation testing) run in a memory-capped container with a watchdog, not directly on the host.
+- **Backups:** have a recent Time Machine backup before running agents unattended.
+- **Leftover QEMU:** `cargo xtask doctor` kills QEMU processes an earlier run left behind, but only outside the sandbox. In an agent session its sweep warns and kills nothing; run `! cargo xtask doctor` yourself to sweep.
+
+Rules for QEMU commands, followed by `cargo xtask run` from M2 (no code enforces them yet):
+
+1. The gdb stub listens on loopback only: `-gdb tcp:127.0.0.1:<port>`, never `-s`, which listens on every interface (checked with `lsof`, [M0.3 log](docs/chunks/m0.3-host-safety/log.md)).
+2. QMP and the monitor are Unix sockets under `target/`, or `-monitor none`; no TCP monitor.
+3. No VNC or SPICE server (`-vnc`, `-spice`); a display, when needed, is a local window (`-display cocoa`).
+4. Disk images live only under `target/`, attached with `readonly=on` or `snapshot=on` unless the guest must write.
+5. `-nic none` unless a chunk needs a network; then user-mode networking, with every `hostfwd` bound to `127.0.0.1`.
+6. No `xtask` command writes to a block device (`/dev/disk*`, `/dev/rdisk*`); flashing real hardware stays a manual step.
+7. Every QEMU child has a deadline and a tag that a later run finds and kills, as `doctor`'s smoke boots do.
+
 ## What CI enforces
 
 These are policy, not preferences. A pull request that breaks one will not be merged:
 
 - Formatting (`cargo fmt`), clippy with warnings denied, docs without warnings, tests, `cargo deny`, typos.
 - **Workflows** (`check-workflows`): actions pinned to commit hashes, a read-only token (a job-level `write` scope only if it is in `WRITE_ALLOWLIST` in `xtask/src/check_workflows.rs`, with a reason), no persisted checkout credentials, no `pull_request_target`.
+- **Agent settings** (`check-settings`): `.claude/settings.json` keeps the required deny rules, the sandbox switches, read denies and credential denies, and relaxes the sandbox (exclusions, write paths, domains, Mach services) only by entries in the allowlists of `xtask/src/check_settings.rs`, each with a reason.
 - **Documentation layout** (`check-docs`): the conventions in [docs/README.md](docs/README.md#conventions).
 - **`unsafe`:** undecided until an M1 chunk replaces [ADR 0002](docs/adr/0002-unsafe-policy-undecided.md); until then no crate other than spikes uses it.
 

@@ -60,7 +60,7 @@ The manual checks come first, in the order the sandbox would otherwise get in th
 
 ### Step 6: documentation (R6)
 
-- [ ] **Who:** main session.
+- [x] **Who:** main session.
 - **Files:** `CONTRIBUTING.md`, `.claude/README.md`, `xtask/README.md`, `AGENTS.md`, `CHANGELOG.md`.
 - **Test first:** `grep -c '^## Host safety' CONTRIBUTING.md` prints 0.
 - **Change:** CONTRIBUTING "Host safety" after "Setting up" (spec §4.4, §4.5, with the `! cargo xtask doctor` sweep) and `check-settings` in "What CI enforces"; `.claude/README.md` (spec §4.6), with the settings from step 3 and their reasons, and `settings.json`'s Contents line updated; the `check-settings` row in `xtask/README.md`'s command table and `check_settings.rs` in its `src/` line; one line under "Rules that fail CI" in `AGENTS.md` and (amendment of 2026-11-28) one saying an excluded command (`gh`, `git push`) runs alone in its Bash call; an M0.3 line at the top of `CHANGELOG.md`'s Unreleased list.

@@ -17,6 +17,7 @@ The other commands are in [xtask/README.md](xtask/README.md).
 
 - Formatting, clippy with warnings denied, docs without warnings, `cargo deny`, typos.
 - `check-workflows`: actions pinned to commit hashes, read-only tokens, no `pull_request_target`.
+- `check-settings`: the sandbox and deny rules in `.claude/settings.json` stay; relax them only through its allowlists, with a reason.
 - `check-docs`: a README in each listed directory, relative links resolve, lesson and rule formats, this file under 80 lines.
 - No code copied from other projects, and no code reused from AI conversations used as research ([ADR 0001](docs/adr/0001-licence-and-originality.md)).
 - The `unsafe` policy is not decided yet ([ADR 0002](docs/adr/0002-unsafe-policy-undecided.md)); do not write kernel code before it is.
@@ -32,6 +33,7 @@ Work is done in chunks, each one GitHub issue scheduled in a milestone, each thr
   - a change would touch an ADR or a CI-enforced policy the spec does not name;
   - a reviewer and the author still disagree after two fix rounds;
   - an action is outward-facing beyond the chunk's branch, pull request and follow-up issues.
+- **Bash runs in the sandbox.** `gh` and `git push` are excluded from it only when run alone in their call, in plain form (`git push origin <branch>`, `gh ... --jq`, no `cd x &&` or pipe); [.claude/README.md](.claude/README.md#sandbox-and-deny-rules).
 - **Pushes to `main` and force pushes are blocked** for agents by a hook (`.claude/hooks/guard-push.sh`). Do not work around it; the maintainer runs such a push themselves.
 - **Write it down as it happens** in the chunk's `log.md` (decisions, surprises, `lesson?` candidates). Agents get killed; what is not on disk is lost.
 - **Lessons** in [docs/lessons/](docs/lessons/) are retrieved by path when planning. Follow them by default; say why when you deviate.
