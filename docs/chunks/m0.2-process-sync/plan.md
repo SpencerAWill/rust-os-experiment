@@ -22,7 +22,7 @@ This chunk runs under the loop as it was when the spec was approved, so stage 7 
 
 ### Step 2: milestones in Pulumi (R6)
 
-- [ ] **Who:** main session
+- [x] **Who:** main session
 - **Files:** `infra/github/index.ts`, `infra/github/README.md`
 - **Test first:** `git grep -n RepositoryMilestone infra/github` finds nothing.
 - **Change:** add the milestones block after the labels, as in the engine (spec §4.5): M0 to M5, with goals copied from the roadmap's milestone table. The README's opening, "When this applies", "Contents" and "Notes" name milestones.
