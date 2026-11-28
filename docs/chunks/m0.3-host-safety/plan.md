@@ -1,6 +1,6 @@
 # M0.3 plan: Host-safety guardrails for agents and later QEMU commands
 
-- **Status:** Accepted (2026-11-27); amended 2026-11-28 with the spec (steps 3, 4, 6; Deviations).
+- **Status:** Historical: executed in PR #17 (2026-11-28); the spec and the code are authoritative. Accepted 2026-11-27; amended 2026-11-28 with the spec (steps 3, 4, 6; Deviations).
 - **Spec:** [spec.md](spec.md). This plan argues from the spec; read both. Progress and surprises go in [log.md](log.md).
 
 ## 1. Approach

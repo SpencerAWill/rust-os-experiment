@@ -1,6 +1,6 @@
 # M0.3: Host-safety guardrails for agents and later QEMU commands
 
-- **Status:** Accepted (2026-11-27); amended 2026-11-28 (gh and git push credentials, the `doctor` sweep: §2, §3, §4.1.2 to §4.1.5, §4.2.3, §4.3, §4.5, §4.6, §5 R2 and R3, §6, §8); second amendment of 2026-11-28 (review findings: §4.1.3, §4.2.3, §4.3, §4.7, §5 R8, §6, §8, §9).
+- **Status:** Implemented (PR #17, 2026-11-28); accepted 2026-11-27, amended 2026-11-28 (gh and git push credentials, the `doctor` sweep: §2, §3, §4.1.2 to §4.1.5, §4.2.3, §4.3, §4.5, §4.6, §5 R2 and R3, §6, §8); second amendment of 2026-11-28 (review findings: §4.1.3, §4.2.3, §4.3, §4.7, §5 R8, §6, §8, §9).
 - **Kind:** build · **Milestone:** M0 (repository foundations) · **Depends on:** M0.1 · **Decides:** no ADR
 - **Issue:** #10
 - **Estimated size:** about 550 changed lines, excluding tests, lockfiles and generated files (settings about 80, `check-settings` about 300, documents about 170)
@@ -152,13 +152,13 @@ The evaluation is run in a Claude Code session in the repository with the sandbo
 
 ## 9. Done when
 
-- [ ] `.claude/settings.json` holds the sandbox (or the logged fallback) and the deny rules, and `cargo xtask ci` passes.
-- [ ] `cargo xtask check-settings` exists, is in `ci`, and has the tests of §8.
-- [ ] `.claude/README.md` records the sandbox decision, its settings with reasons, and that deny rules are a guardrail.
-- [ ] CONTRIBUTING has a "Host safety" section with the QEMU rules, `--no-upgrade`, long jobs and backups.
-- [ ] The manual checks of R3, R4 and R7 are in `log.md` with commands and output.
-- [ ] The agent-token follow-up issue is open and linked from #10's pull request.
-- [ ] *(Second amendment of 2026-11-28)* `guard-push` refuses the forms of §4.7, and the push-hook follow-up issue is open, names the hook's build-from-the-tree escape and the planted-git-directory paths of §4.7, and is linked from the pull request.
+- [x] `.claude/settings.json` holds the sandbox (or the logged fallback) and the deny rules, and `cargo xtask ci` passes. (No fallback; `log.md` 2026-11-28 re-verify entries, last on 99e9c43; CI on PR #17 pending at close-out.)
+- [x] `cargo xtask check-settings` exists, is in `ci`, and has the tests of §8. (`xtask/src/check_settings.rs`, `ci_steps` and `.github/workflows/ci.yml`; 51 tests.)
+- [x] `.claude/README.md` records the sandbox decision, its settings with reasons, and that deny rules are a guardrail. ("Sandbox and deny rules".)
+- [x] CONTRIBUTING has a "Host safety" section with the QEMU rules, `--no-upgrade`, long jobs and backups.
+- [x] The manual checks of R3, R4 and R7 are in `log.md` with commands and output. (Step 1, step 2, step 3 re-run, and the second-amendment probes.)
+- [x] The agent-token follow-up issue is open and linked from #10's pull request. (#15, linked from PR #17.)
+- [x] *(Second amendment of 2026-11-28)* `guard-push` refuses the forms of §4.7, and the push-hook follow-up issue is open, names the hook's build-from-the-tree escape and the planted-git-directory paths of §4.7, and is linked from the pull request. (`guard_push` tests; #16, linked from PR #17.)
 
 ## 10. Open questions
 
