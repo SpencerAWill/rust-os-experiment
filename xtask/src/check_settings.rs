@@ -13,10 +13,19 @@
 //!    `sandbox.filesystem.allowWrite` ([`WRITE_PATH_ALLOWLIST`]), `sandbox.network.allowedDomains`
 //!    ([`DOMAIN_ALLOWLIST`]) and `sandbox.network.allowMachLookup` ([`MACH_LOOKUP_ALLOWLIST`],
 //!    empty).
-//! 5. `sandbox.network.allowLocalBinding` and `allowAllUnixSockets` are not set to anything but
-//!    `false`, `allowUnixSockets` has no entry, and `sandbox.filesystem.allowRead` has no entry.
-//! 6. `permissions.allow` has no bare tool name (`Bash`, `Read`, `Edit`, `Write`) and no
-//!    `Bash(*)`.
+//! 5. The switches of [`FORBIDDEN_TRUE`] are not `true` (`allowLocalBinding`,
+//!    `allowAllUnixSockets`, `filesystem.disabled`, `filesystem.allowGitConfig`,
+//!    `allowAppleEvents`, `enableWeakerNestedSandbox`, `enableWeakerNetworkIsolation`,
+//!    `allowNestedUserNamespaces`, `autoAllowBashIfSandboxed`, top-level `disableAllHooks`); the
+//!    keys of [`FORBIDDEN_ANY_VALUE`] (`network.httpProxyPort`, `socksProxyPort`) are absent; the
+//!    lists of [`MUST_BE_EMPTY`] have no entry (`network.allowUnixSockets`,
+//!    `filesystem.allowRead`, `filesystem.allowWriteWithinDeny`, `ignoreViolations`,
+//!    `permissions.additionalDirectories`). Also `sandbox.allowPty`, `enableAllProjectMcpServers`,
+//!    `skipDangerousModePermissionPrompt` and `skipAutoPermissionPrompt` are not `true`; and
+//!    `sandbox.mandatoryDenySearchDepth`, `network.mitmProxy`, `sandbox.seccomp` and
+//!    `permissions.defaultMode` (any value, a personal preference) are absent.
+//! 6. `permissions.allow` has no bare tool name (`Bash`, `Read`, `Edit`, `Write`), no `Bash(*)`
+//!    and no entry starting `Edit(` or `WebFetch(domain:` ([`FORBIDDEN_ALLOW_PREFIXES`]).
 //! 7. The file is valid JSON and each field above has the right type.
 //!
 //! It reads only `.claude/settings.json` (the shared file, not `settings.local.json`), writes
@@ -65,6 +74,7 @@ const REQUIRED_DENY: &[&str] = &[
     "Read(~/.cargo/credentials)",
     "Edit(/.git/hooks/**)",
     "Edit(/.git/config)",
+    "Edit(/.claude/settings.local.json)",
 ];
 
 /// The paths `sandbox.filesystem.denyRead` must hold (spec §4.1.5).
@@ -109,8 +119,14 @@ const EXCLUDED_ALLOWLIST: &[&str] = &[
     "gh search *",
     // Shows whether `gh` is logged in; reads the token's config.
     "gh auth status",
-    // Pushes the chunk branch; the `osxkeychain` credential helper needs the keychain.
-    "git push *",
+    // Pushes the chunk branch to `origin` (the loop's form); the credential helper or key lives
+    // in a path the sandbox denies (`osxkeychain` and the keychain on macOS). Pinned to `origin`
+    // because `git push *` also matched `--receive-pack=<cmd> <path>`, `--exec=<cmd>` and
+    // local-path remotes, which run any command outside the sandbox; `guard-push` refuses those
+    // flags (spec §4.7).
+    "git push origin *",
+    // The same with `-u`, for the first push of a branch.
+    "git push -u origin *",
 ];
 
 /// The paths outside the repository a sandboxed command may write (`sandbox.filesystem.allowWrite`).
@@ -132,6 +148,53 @@ const DOMAIN_ALLOWLIST: &[&str] = &[
 /// Empty: `com.apple.sysmond` would fix only the `doctor` sweep's `pgrep` listing and would let
 /// every sandboxed command list the host's processes and their arguments (spec §4.1.3).
 const MACH_LOOKUP_ALLOWLIST: &[&str] = &[];
+
+/// Booleans that relax the sandbox or the permission rules; `true` is a finding.
+const FORBIDDEN_TRUE: &[&[&str]] = &[
+    &["sandbox", "network", "allowLocalBinding"],
+    &["sandbox", "network", "allowAllUnixSockets"],
+    &["sandbox", "filesystem", "disabled"],
+    &["sandbox", "filesystem", "allowGitConfig"],
+    &["sandbox", "allowAppleEvents"],
+    &["sandbox", "enableWeakerNestedSandbox"],
+    &["sandbox", "enableWeakerNetworkIsolation"],
+    &["sandbox", "allowNestedUserNamespaces"],
+    &["sandbox", "autoAllowBashIfSandboxed"],
+    &["disableAllHooks"],
+    &["sandbox", "allowPty"],
+    // MCP servers run outside the sandbox.
+    &["enableAllProjectMcpServers"],
+    // Approval preferences, personal (spec §2).
+    &["skipDangerousModePermissionPrompt"],
+    &["skipAutoPermissionPrompt"],
+];
+
+/// Keys that must be absent: any value relaxes the sandbox (a proxy port sends traffic around
+/// the domain allowlist) or is a personal preference.
+const FORBIDDEN_ANY_VALUE: &[&[&str]] = &[
+    &["sandbox", "network", "httpProxyPort"],
+    &["sandbox", "network", "socksProxyPort"],
+    // Lowering the depth relaxes; the default is used.
+    &["sandbox", "mandatoryDenySearchDepth"],
+    // Routes domains to an upstream proxy.
+    &["sandbox", "network", "mitmProxy"],
+    // Custom seccomp binaries.
+    &["sandbox", "seccomp"],
+    // The default mode is a personal approval preference (spec §2).
+    &["permissions", "defaultMode"],
+];
+
+/// Lists that must stay empty (an object counts by its keys).
+const MUST_BE_EMPTY: &[&[&str]] = &[
+    &["sandbox", "network", "allowUnixSockets"],
+    &["sandbox", "filesystem", "allowRead"],
+    &["sandbox", "filesystem", "allowWriteWithinDeny"],
+    &["sandbox", "ignoreViolations"],
+    &["permissions", "additionalDirectories"],
+];
+
+/// Prefixes of `permissions.allow` entries that grant sandbox writes or hosts.
+const FORBIDDEN_ALLOW_PREFIXES: &[&str] = &["Edit(", "WebFetch(domain:"];
 
 /// Tool names that, bare in `permissions.allow`, allow every call of the tool.
 const BARE_TOOLS: &[&str] = &["Bash", "Read", "Edit", "Write"];
@@ -181,6 +244,21 @@ fn forbid_true(root: &Value, path: &[&str], findings: &mut Vec<String>) {
     match get(root, path) {
         None | Some(Value::Bool(false)) => {}
         Some(other) => findings.push(format!("{name} must be false or absent, found {other}")),
+    }
+}
+
+/// A finding for each entry of the list at `path`, or each key of the object there.
+fn require_empty(root: &Value, path: &[&str], findings: &mut Vec<String>) {
+    match get(root, path) {
+        Some(Value::Object(map)) => {
+            for key in map.keys() {
+                findings.push(format!(
+                    "{} has the key `{key}`, it must be empty",
+                    path.join(".")
+                ));
+            }
+        }
+        _ => allow_only(root, path, &[], findings),
     }
 }
 
@@ -247,6 +325,13 @@ fn check(settings: &Value) -> Vec<String> {
             f.push(format!(
                 "permissions.allow has `{entry}`, which allows every call of the tool"
             ));
+        } else if FORBIDDEN_ALLOW_PREFIXES
+            .iter()
+            .any(|p| entry.starts_with(p))
+        {
+            f.push(format!(
+                "permissions.allow has `{entry}`, which grants sandbox writes or hosts"
+            ));
         }
     }
 
@@ -278,14 +363,16 @@ fn check(settings: &Value) -> Vec<String> {
         allow_only(settings, path, allowed, f);
     }
 
-    forbid_true(settings, &["sandbox", "network", "allowLocalBinding"], f);
-    forbid_true(settings, &["sandbox", "network", "allowAllUnixSockets"], f);
-    // Lists that must stay empty.
-    for path in [
-        &["sandbox", "network", "allowUnixSockets"][..],
-        &["sandbox", "filesystem", "allowRead"],
-    ] {
-        allow_only(settings, path, &[], f);
+    for path in FORBIDDEN_TRUE {
+        forbid_true(settings, path, f);
+    }
+    for path in FORBIDDEN_ANY_VALUE {
+        if let Some(value) = get(settings, path) {
+            f.push(format!("{} must be absent, found {value}", path.join(".")));
+        }
+    }
+    for path in MUST_BE_EMPTY {
+        require_empty(settings, path, f);
     }
 
     findings
@@ -449,7 +536,15 @@ mod tests {
 
     #[test]
     fn an_unlisted_exclusion_is_a_finding_including_wildcards() {
-        for entry in ["gh *", "*", "~", "git push", "git push *; true"] {
+        for entry in [
+            "gh *",
+            "*",
+            "~",
+            "git push",
+            "git push *",
+            "git push --receive-pack=x *",
+            "git push *; true",
+        ] {
             let findings = findings_after(|s| {
                 s["sandbox"]["excludedCommands"]
                     .as_array_mut()
@@ -542,6 +637,167 @@ mod tests {
             });
             assert_one(&findings, &format!("`{entry}`"));
         }
+    }
+
+    #[test]
+    fn disable_all_hooks_true_is_a_finding() {
+        let findings = findings_after(|s| s["disableAllHooks"] = json!(true));
+        assert_one(&findings, "disableAllHooks");
+    }
+
+    #[test]
+    fn allow_git_config_true_is_a_finding() {
+        let findings =
+            findings_after(|s| s["sandbox"]["filesystem"]["allowGitConfig"] = json!(true));
+        assert_one(&findings, "allowGitConfig");
+    }
+
+    #[test]
+    fn filesystem_disabled_true_is_a_finding() {
+        let findings = findings_after(|s| s["sandbox"]["filesystem"]["disabled"] = json!(true));
+        assert_one(&findings, "filesystem.disabled");
+    }
+
+    #[test]
+    fn allow_apple_events_true_is_a_finding() {
+        let findings = findings_after(|s| s["sandbox"]["allowAppleEvents"] = json!(true));
+        assert_one(&findings, "allowAppleEvents");
+    }
+
+    #[test]
+    fn weaker_nested_sandbox_true_is_a_finding() {
+        let findings = findings_after(|s| s["sandbox"]["enableWeakerNestedSandbox"] = json!(true));
+        assert_one(&findings, "enableWeakerNestedSandbox");
+    }
+
+    #[test]
+    fn weaker_network_isolation_true_is_a_finding() {
+        let findings =
+            findings_after(|s| s["sandbox"]["enableWeakerNetworkIsolation"] = json!(true));
+        assert_one(&findings, "enableWeakerNetworkIsolation");
+    }
+
+    #[test]
+    fn nested_user_namespaces_true_is_a_finding() {
+        let findings = findings_after(|s| s["sandbox"]["allowNestedUserNamespaces"] = json!(true));
+        assert_one(&findings, "allowNestedUserNamespaces");
+    }
+
+    #[test]
+    fn auto_allow_bash_if_sandboxed_true_is_a_finding() {
+        let findings = findings_after(|s| s["sandbox"]["autoAllowBashIfSandboxed"] = json!(true));
+        assert_one(&findings, "autoAllowBashIfSandboxed");
+    }
+
+    #[test]
+    fn any_proxy_port_is_a_finding() {
+        for key in ["httpProxyPort", "socksProxyPort"] {
+            for value in [json!(8080), json!(0), json!("8080")] {
+                let findings = findings_after(|s| s["sandbox"]["network"][key] = value.clone());
+                assert_one(&findings, key);
+            }
+        }
+    }
+
+    #[test]
+    fn an_ignore_violations_entry_is_a_finding() {
+        let findings = findings_after(|s| {
+            s["sandbox"]["ignoreViolations"] = json!({ "*": ["/usr/bin"] });
+        });
+        assert_one(&findings, "ignoreViolations");
+        let empty = findings_after(|s| s["sandbox"]["ignoreViolations"] = json!({}));
+        assert!(empty.is_empty(), "{empty:?}");
+    }
+
+    #[test]
+    fn an_allow_write_within_deny_entry_is_a_finding() {
+        let findings = findings_after(|s| {
+            s["sandbox"]["filesystem"]["allowWriteWithinDeny"] = json!(["~/.ssh"]);
+        });
+        assert_one(&findings, "~/.ssh");
+    }
+
+    #[test]
+    fn an_additional_directory_is_a_finding() {
+        let findings = findings_after(|s| {
+            s["permissions"]["additionalDirectories"] = json!(["/tmp"]);
+        });
+        assert_one(&findings, "additionalDirectories");
+    }
+
+    #[test]
+    fn any_default_mode_is_a_finding() {
+        for mode in ["bypassPermissions", "plan", "acceptEdits", "default"] {
+            let findings = findings_after(|s| s["permissions"]["defaultMode"] = json!(mode));
+            assert_one(&findings, "defaultMode");
+        }
+    }
+
+    #[test]
+    fn allow_pty_true_is_a_finding() {
+        let findings = findings_after(|s| s["sandbox"]["allowPty"] = json!(true));
+        assert_one(&findings, "allowPty");
+    }
+
+    #[test]
+    fn enable_all_project_mcp_servers_true_is_a_finding() {
+        let findings = findings_after(|s| s["enableAllProjectMcpServers"] = json!(true));
+        assert_one(&findings, "enableAllProjectMcpServers");
+    }
+
+    #[test]
+    fn skip_dangerous_mode_permission_prompt_true_is_a_finding() {
+        let findings = findings_after(|s| s["skipDangerousModePermissionPrompt"] = json!(true));
+        assert_one(&findings, "skipDangerousModePermissionPrompt");
+    }
+
+    #[test]
+    fn skip_auto_permission_prompt_true_is_a_finding() {
+        let findings = findings_after(|s| s["skipAutoPermissionPrompt"] = json!(true));
+        assert_one(&findings, "skipAutoPermissionPrompt");
+    }
+
+    #[test]
+    fn a_mandatory_deny_search_depth_is_a_finding() {
+        let findings = findings_after(|s| s["sandbox"]["mandatoryDenySearchDepth"] = json!(1));
+        assert_one(&findings, "mandatoryDenySearchDepth");
+    }
+
+    #[test]
+    fn a_mitm_proxy_is_a_finding() {
+        let findings = findings_after(|s| {
+            s["sandbox"]["network"]["mitmProxy"] =
+                json!({ "socketPath": "/tmp/x", "domains": ["*"] });
+        });
+        assert_one(&findings, "mitmProxy");
+    }
+
+    #[test]
+    fn a_seccomp_config_is_a_finding() {
+        let findings = findings_after(|s| s["sandbox"]["seccomp"] = json!({ "bpfPath": "/tmp/x" }));
+        assert_one(&findings, "sandbox.seccomp");
+    }
+
+    #[test]
+    fn an_edit_allow_entry_is_a_finding() {
+        let findings = findings_after(|s| {
+            s["permissions"]["allow"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!("Edit(/docs/**)"));
+        });
+        assert_one(&findings, "Edit(/docs/**)");
+    }
+
+    #[test]
+    fn a_web_fetch_domain_allow_entry_is_a_finding() {
+        let findings = findings_after(|s| {
+            s["permissions"]["allow"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!("WebFetch(domain:example.com)"));
+        });
+        assert_one(&findings, "WebFetch(domain:example.com)");
     }
 
     #[test]
