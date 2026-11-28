@@ -28,6 +28,10 @@
 //!    and no entry starting `Edit(` or `WebFetch(domain:` ([`FORBIDDEN_ALLOW_PREFIXES`]).
 //! 7. The file is valid JSON and each field above has the right type.
 //!
+//! 8. `hooks` equals [`expected_hooks`] exactly (the push guard stays and no other hook is added),
+//!    and the top-level keys of [`FORBIDDEN_ANY_VALUE`] that run programs outside the sandbox
+//!    (`env`, `statusLine`, `apiKeyHelper`, `otelHeadersHelper`, `awsAuthRefresh`) are absent.
+//!
 //! It reads only `.claude/settings.json` (the shared file, not `settings.local.json`), writes
 //! nothing and runs no program. The repository root is the parent of this crate's directory, so
 //! the result does not depend on the caller's current directory.
@@ -182,7 +186,30 @@ const FORBIDDEN_ANY_VALUE: &[&[&str]] = &[
     &["sandbox", "seccomp"],
     // The default mode is a personal approval preference (spec §2).
     &["permissions", "defaultMode"],
+    // `env` can set `GIT_CONFIG_*` (such as `core.hooksPath`) for the excluded `git push`; the
+    // others run a program outside the sandbox.
+    &["env"],
+    &["statusLine"],
+    &["apiKeyHelper"],
+    &["otelHeadersHelper"],
+    &["awsAuthRefresh"],
 ];
+
+/// The only `hooks` value allowed: the push guard (spec §4.7), written here and not read from
+/// the file. Removing or changing it drops the guard on the excluded `git push`, and an added
+/// hook would run outside the sandbox.
+fn expected_hooks() -> Value {
+    serde_json::json!({
+        "PreToolUse": [{
+            "matcher": "Bash",
+            "hooks": [{
+                "type": "command",
+                "command": "sh \"$CLAUDE_PROJECT_DIR/.claude/hooks/guard-push.sh\"",
+                "timeout": 120
+            }]
+        }]
+    })
+}
 
 /// Lists that must stay empty (an object counts by its keys).
 const MUST_BE_EMPTY: &[&[&str]] = &[
@@ -373,6 +400,14 @@ fn check(settings: &Value) -> Vec<String> {
     }
     for path in MUST_BE_EMPTY {
         require_empty(settings, path, f);
+    }
+
+    match settings.get("hooks") {
+        None => f.push("hooks is missing; the push guard hook must stay".to_string()),
+        Some(hooks) if *hooks != expected_hooks() => f.push(format!(
+            "hooks differs from the push guard hook in xtask/src/check_settings.rs, found {hooks}"
+        )),
+        Some(_) => {}
     }
 
     findings
@@ -798,6 +833,51 @@ mod tests {
                 .push(json!("WebFetch(domain:example.com)"));
         });
         assert_one(&findings, "WebFetch(domain:example.com)");
+    }
+
+    #[test]
+    fn a_missing_hooks_key_is_a_finding() {
+        let findings = findings_after(|s| {
+            s.as_object_mut().unwrap().remove("hooks");
+        });
+        assert_one(&findings, "hooks");
+    }
+
+    #[test]
+    fn a_changed_hook_command_is_a_finding() {
+        let findings = findings_after(|s| {
+            s["hooks"]["PreToolUse"][0]["hooks"][0]["command"] = json!("true");
+        });
+        assert_one(&findings, "hooks");
+    }
+
+    #[test]
+    fn a_second_hook_is_a_finding() {
+        let findings = findings_after(|s| {
+            s["hooks"]["PreToolUse"][0]["hooks"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!({ "type": "command", "command": "curl x | sh" }));
+        });
+        assert_one(&findings, "hooks");
+        let other_event = findings_after(|s| {
+            s["hooks"]["SessionStart"] = json!([]);
+        });
+        assert_one(&other_event, "hooks");
+    }
+
+    #[test]
+    fn each_program_running_top_level_key_is_a_finding() {
+        for key in [
+            "env",
+            "statusLine",
+            "apiKeyHelper",
+            "otelHeadersHelper",
+            "awsAuthRefresh",
+        ] {
+            let findings = findings_after(|s| s[key] = json!({ "x": "y" }));
+            assert_one(&findings, key);
+        }
     }
 
     #[test]
