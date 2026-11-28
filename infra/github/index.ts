@@ -16,6 +16,7 @@ import { PrivateVulnerabilityReporting } from "./privateVulnerabilityReporting";
 
 const config = new pulumi.Config();
 const repoName = "rust-os-experiment";
+const owner = new pulumi.Config("github").require("owner");
 
 // ---------------------------------------------------------------------------------------------
 // Repository settings
@@ -80,7 +81,7 @@ new github.RepositoryDependabotSecurityUpdates(
 
 // Not in the provider (6.15.1), so a dynamic resource calls the REST API; see its file.
 new PrivateVulnerabilityReporting("private-vulnerability-reporting", {
-    owner: new pulumi.Config("github").require("owner"),
+    owner,
     repository: repo.name,
     enabled: true,
 });
@@ -209,7 +210,7 @@ for (const { title, goal } of milestones) {
     new github.RepositoryMilestone(
         `milestone-${title.toLowerCase()}`,
         {
-            owner: new pulumi.Config("github").require("owner"),
+            owner,
             repository: repo.name,
             title,
             description: `${goal}. Goal and exit criteria: https://github.com/SpencerAWill/rust-os-experiment/blob/main/docs/roadmap.md#milestones`,
