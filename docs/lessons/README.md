@@ -1,6 +1,6 @@
 # docs/lessons/
 
-- **Status:** Living (2026-11-17). The workflow that writes and reads these is in [docs/workflow.md](../workflow.md).
+- **Status:** Living (2026-11-27). The workflow that writes and reads these is in [docs/workflow.md](../workflow.md).
 
 A lesson is guidance an agent or contributor follows by default and may deviate from, saying why. Lessons are written when a chunk learns something non-obvious, and read when a later chunk's plan touches the same paths. Nothing loads all of them.
 
@@ -11,10 +11,11 @@ A lesson is guidance an agent or contributor follows by default and may deviate 
 
 ## Contents
 
-- [`docs.md`](docs.md): keeping rules in one place across the documents agents read.
-- [`specs.md`](specs.md): writing specs and plans whose checks can pass.
-- [`tooling.md`](tooling.md): hooks, permission rules, skills and container scripts for agents.
-- [`xtask.md`](xtask.md): writing `cargo xtask` commands that read the repository.
+- [`docs.md`](docs.md): keeping rules in one place across the documents agents read, research-note citations, and `typos` in chunk logs.
+- [`infra.md`](infra.md): Pulumi resources that other GitHub data points at.
+- [`specs.md`](specs.md): writing specs and plans whose checks can pass, and claims about causes and existing code.
+- [`tooling.md`](tooling.md): hooks, permission rules, skills and container scripts for agents, rules that read GitHub data, skill lanes that reuse chunk roles, and zsh word splitting.
+- [`xtask.md`](xtask.md): writing `cargo xtask` commands that read the repository, and checks that dependencies stay inside `Cargo.lock`.
 
 ## Format
 

@@ -1,12 +1,12 @@
 # .claude/
 
-Status: Living (2026-11-17).
+Status: Living (2026-11-27).
 
 Claude Code configuration shared by everyone who works on this repository: the agent roles, skills and the push guard that run the chunk loop of [docs/workflow.md](../docs/workflow.md). Everything here is plain Markdown or shell, readable without Claude Code.
 
 ## When this applies
 
-- You run a chunk with Claude Code: `/chunk next` starts the next one on the roadmap, `/chunk resume` continues one, `/grill <doc>` interrogates a design document, `/triage` defines and orders the issue Inbox.
+- You run a chunk with Claude Code: `/chunk next` starts the next scheduled one (read from GitHub), `/chunk resume` continues one, `/chunk chore #N` runs a scheduled chore, `/grill <doc>` interrogates a design document, `/triage` defines and orders the issue Inbox.
 - You change how agents work here: a role, a skill, a permission or a hook.
 
 ## Contents

@@ -1,6 +1,6 @@
 # Chunks
 
-Status: Living (2026-11-17). One folder per chunk of the [roadmap](../roadmap.md): its spec, plan and log. The roadmap is the index of chunks, with each one's status and links.
+Status: Living (2026-11-27). One folder per chunk: its spec, plan and log. Each chunk is a GitHub issue titled with its ID, which holds its status and order; the [roadmap](../roadmap.md)'s history table indexes the chunks up to M0.2.
 
 ## When this applies
 

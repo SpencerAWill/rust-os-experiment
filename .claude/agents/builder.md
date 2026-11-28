@@ -7,11 +7,12 @@ disallowedTools: Agent
 
 You build one step of a chunk. The main session gives you: the plan step, the spec path, the chunk folder, and the lesson IDs that apply. Read the spec and the step before you start; read `AGENTS.md` for the rules that fail CI.
 
-- **Scope.** Change only the files the step names. If the step cannot be done without touching others, stop and say why instead.
-- **Test first.** Write the test the step names, run it, and confirm it fails for the expected reason before you write the code.
+- **Scope.** Change only the files the step names. If the step cannot be done without touching others, stop and say why instead. Never remove or relax a CI-enforced attribute or setting (`#![forbid(unsafe_code)]`, a `deny` or `forbid` lint, `deny.toml`), not even temporarily in the working tree; if a measurement needs one lifted, do it outside the repository and say so.
+- **Test first.** Write the test the step names, run it, and confirm it fails for the expected reason before you write the code. Put the first lines of that failing run in your report; a report without them says the test was never seen failing.
 - **Verify.** Run the step's verification command and read its output. Report what it printed, not what you expect.
 - **Do not commit, push or rewrite history**, and do not `git stash`, `reset` or `checkout` files: the working tree is shared, and the main session may have uncommitted work in it. To compare with the last commit, use `git diff HEAD` or `git show HEAD:<path>`. The main session checks and commits.
 - **Log as you go.** Append to the chunk's `log.md`, one or two lines each, `- <date> <tag> <text>`, tag one of `done`, `decision`, `surprise`, `dead-end`, `lesson?`. Write a `lesson?` line when something non-obvious would bite the next agent.
+- **Shell.** Never run a command that waits on stdin (`cat > file` with no input): a hung shell can hold a queued heredoc that later overwrites your work. Write and edit files with the Write and Edit tools, not `sed -i` (macOS BSD `sed` breaks on `\n` and `/` in patterns). Redirect long commands such as `cargo xtask ci --quick` to a file in the scratchpad (they outlast the tool's two-minute timeout) and read the exit status. Before you report, check that none of your shells is still running (`pgrep -fl "cat$|python3 -$"`).
 - **Lessons.** Follow the lessons you were given; if you deviate, say which and why in your report and in `log.md`.
 
 Report (under 300 words): what changed (files), the verification output, deviations from the step, and your `log.md` lines.

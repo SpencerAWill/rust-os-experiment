@@ -16,6 +16,7 @@ import { PrivateVulnerabilityReporting } from "./privateVulnerabilityReporting";
 
 const config = new pulumi.Config();
 const repoName = "rust-os-experiment";
+const owner = new pulumi.Config("github").require("owner");
 
 // ---------------------------------------------------------------------------------------------
 // Repository settings
@@ -80,7 +81,7 @@ new github.RepositoryDependabotSecurityUpdates(
 
 // Not in the provider (6.15.1), so a dynamic resource calls the REST API; see its file.
 new PrivateVulnerabilityReporting("private-vulnerability-reporting", {
-    owner: new pulumi.Config("github").require("owner"),
+    owner,
     repository: repo.name,
     enabled: true,
 });
@@ -186,6 +187,38 @@ const labels: { name: string; color: string; description: string }[] = [
 ];
 
 new github.IssueLabels("labels", { repository: repo.name, labels });
+
+// ---------------------------------------------------------------------------------------------
+// Milestones (M0.2): one per roadmap milestone. Never remove an entry, even once the milestone is
+// closed: issues point at it, and `retainOnDelete` only keeps the milestone on GitHub (it would
+// no longer be managed). Goals and exit criteria are documents and stay in docs/roadmap.md; a
+// milestone holds the issues that belong to it. Pulumi creates them and then ignores `state`, so
+// a milestone is closed at its boundary with one command (docs/maintainers.md, "When a milestone
+// completes"), not a change here.
+// ---------------------------------------------------------------------------------------------
+
+const milestones: { title: string; goal: string }[] = [
+    { title: "M0", goal: "Repository foundations" },
+    { title: "M1", goal: "Research and architecture decisions" },
+    { title: "M2", goal: "Boot skeleton" },
+    { title: "M3", goal: "Exokernel core" },
+    { title: "M4", goal: "Two microkernels side by side" },
+    { title: "M5", goal: "Shim" },
+];
+
+for (const { title, goal } of milestones) {
+    new github.RepositoryMilestone(
+        `milestone-${title.toLowerCase()}`,
+        {
+            owner,
+            repository: repo.name,
+            title,
+            description: `${goal}. Goal and exit criteria: https://github.com/SpencerAWill/rust-os-experiment/blob/main/docs/roadmap.md#milestones`,
+            state: "open",
+        },
+        { ignoreChanges: ["state"], retainOnDelete: true },
+    );
+}
 
 // ---------------------------------------------------------------------------------------------
 // GitHub Actions

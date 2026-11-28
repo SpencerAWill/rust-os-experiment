@@ -1,45 +1,35 @@
 # Roadmap
 
-Status: Accepted (2026-11-17). The source of truth for what is planned and how far along it is.
+Status: Accepted (2026-11-17); amended by [M0.2](chunks/m0.2-process-sync/spec.md) (2026-11-27). The milestone goals and exit criteria, the later milestones' rough lists, and the history of the chunks up to M0.2. What is scheduled, its order and its status are on GitHub: chunk issues, [milestones](https://github.com/SpencerAWill/rust-os-experiment/milestones) and the "OS backlog" Project ([workflow.md](workflow.md#from-issue-to-chunk)).
 
-Work is organized as **milestones** (a goal with exit criteria) broken into **chunks** (one small pull request each, with its own spec and plan in [`chunks/`](chunks/)). Only the current milestone is broken into chunks; later ones carry a rough list that is refined when they become current. Chunk IDs (`M1.1`) are never reused or renumbered; order comes from the dependency column. The process is in [workflow.md](workflow.md).
-
-Row statuses: `Planned`, `Drafting`, `Accepted`, `In progress`, `Done (PR #n)`, `Dropped (reason)`. `Drafting` to `In progress` are set on the chunk's branch, so on `main` a row normally goes from `Planned` straight to `Done`.
+Work is organized as **milestones** (a goal with exit criteria) broken into **chunks** (one small pull request each, with its own spec and plan in [`chunks/`](chunks/)). Only the current milestone is broken into chunks, each a GitHub issue titled with its ID; later ones carry a rough list below that becomes chunk issues when they become current. Chunk IDs (`M1.1`) are never reused or renumbered; order comes from the Project's Order field and "blocked by" links (the dependency column below is history). The process is in [workflow.md](workflow.md).
 
 ## Milestones
 
-| Milestone | Goal | Exit criteria | Status |
-|---|---|---|---|
-| M0 | Repository foundations | The workflow, CI, settings and research seed are merged; the development environment is checked by `cargo xtask doctor`; `/chunk next` starts M1.1 | Current |
-| M1 | Research and architecture decisions | ADRs accepted for the privilege model, the boot path and toolchain, the test strategy and `unsafe` policy, the exokernel interface, the shim's placement and the crate layout, each backed by a research note in `research/` | Next (after M0.1) |
-| M2 | Boot skeleton | One binary boots under QEMU on x86_64, aarch64 and riscv64, prints over serial, and is tested headless in CI | Later |
-| M3 | Exokernel core | Physical memory, capabilities and domains, tested on all three architectures | Later |
-| M4 | Two microkernels side by side | Two different microkernels or library OSes run at once on the exokernel and exchange a typed message (the first target milestone) | Later |
-| M5 | Shim | The first interposition features at the trap boundary, enabled per domain | Later |
+| Milestone | Goal | Exit criteria |
+|---|---|---|
+| M0 | Repository foundations | The workflow, CI, settings and research seed are merged; the development environment is checked by `cargo xtask doctor`; the process matches `rust-engine-experiment`'s (M0.2); the host-safety guardrails are in (M0.3); `cargo xtask spike` runs a spike (M0.4); `/chunk next` starts M1.1 |
+| M1 | Research and architecture decisions | ADRs accepted for the privilege model, the boot path and toolchain, the test strategy and `unsafe` policy, the exokernel interface, the shim's placement and the crate layout, each backed by a research note in `research/` |
+| M2 | Boot skeleton | One binary boots under QEMU on x86_64, aarch64 and riscv64, prints over serial, and is tested headless in CI |
+| M3 | Exokernel core | Physical memory, capabilities and domains, tested on all three architectures |
+| M4 | Two microkernels side by side | Two different microkernels or library OSes run at once on the exokernel and exchange a typed message (the first target milestone) |
+| M5 | Shim | The first interposition features at the trap boundary, enabled per domain |
+
+Milestones are GitHub [milestones](https://github.com/SpencerAWill/rust-os-experiment/milestones), which hold their issues and progress; the current one is the open milestone with the lowest number.
 
 ## M0 chunks
+
+This table is frozen at M0.2: later chunks, M0.3 and M0.4 included, are GitHub issues in the [milestones](https://github.com/SpencerAWill/rust-os-experiment/milestones), ordered in the Project. Row statuses were `Planned`, `Drafting`, `Accepted`, `In progress`, `Done (PR #n)` and `Dropped (reason)`.
 
 | Chunk | Title | Depends on | Status | Spec and plan |
 |---|---|---|---|---|
 | M0.0 | Repository foundations: the chunk workflow with build and research chunks, agent roles and skills, the push guard, `cargo xtask` process checks, CI, Pulumi-managed settings, the issue Project, ADRs 0001-0002, research notes from the initial architecture conversation | none | Done (PR #1) | [spec](chunks/m0.0-foundations/spec.md), [plan](chunks/m0.0-foundations/plan.md) |
 | M0.1 | Development environment: host tools and Rust targets, `cargo xtask doctor`, a local reference library of specifications, and the tool survey as a research note | M0.0 | Done (PR #11) | [spec](chunks/m0.1-dev-environment/spec.md), [plan](chunks/m0.1-dev-environment/plan.md) |
-
-## M1 chunks (research)
-
-Each is a research chunk ([workflow](workflow.md#research-chunks)): a note in `research/`, and an ADR where it decides. The questions are in [research/open-questions.md](research/open-questions.md).
-
-| Chunk | Title | Depends on | Status | Spec and plan |
-|---|---|---|---|---|
-| M1.1 | Privilege model: where the exokernel and the microkernels run on each architecture (exokernel in the kernel mode with user-mode library OSes, or an exokernel on the virtualization extensions with microkernels in guest kernel mode), and what QEMU on an M4 Pro supports for each | none | Planned | |
-| M1.2 | Boot path and toolchain: bootloader, target triples, stable or nightly, linker scripts, image building | none | Planned | |
-| M1.3 | Test and debug strategy (host tests, QEMU in CI, GDB, serial) and the `unsafe` policy, superseding ADR 0002 | M1.2 | Planned | |
-| M1.4 | Exokernel interface: resources, capabilities, the call and event ABI, revocation | M1.1 | Planned | |
-| M1.5 | Shim placement and its first features | M1.1, M1.4 | Planned | |
-| M1.6 | Crate and workspace layout for several binaries and targets | M1.1, M1.2 | Planned | |
+| M0.2 | Process sync with rust-engine-experiment: planning state on GitHub (chunk issues, milestones, the Project's Order field), chores, the pause after the plan, the newer builder, simplify, re-verify and grill rules, and the engine's general lessons | M0.1 | Done (PR #14) | [spec](chunks/m0.2-process-sync/spec.md) |
 
 ## Later milestones
 
-Rough lists, refined when each becomes current.
+Rough lists, refined when each becomes current: then its list becomes chunk issues in its GitHub milestone ([maintainers.md](maintainers.md#when-a-milestone-completes)).
 
 | Milestone | Rough chunks | Open question |
 |---|---|---|

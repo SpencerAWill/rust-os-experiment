@@ -1,9 +1,9 @@
 # GitHub configuration (Pulumi)
 
-Status: Living (2026-11-15)
+Status: Living (2026-11-27)
 
 This Pulumi project declares the GitHub settings for `SpencerAWill/rust-os-experiment`:
-repository settings, the ruleset on `main`, labels, Actions permissions, Actions variables
+repository settings, the ruleset on `main`, labels, milestones, Actions permissions, Actions variables
 and secrets, Dependabot security updates and private vulnerability reporting. `index.ts` is the source of truth. A setting changed in the GitHub UI is drift, and
 the next `pulumi up` reverts it.
 
@@ -11,12 +11,12 @@ Commands run on your machine. Pulumi Cloud only stores the state (stack `Spencer
 
 ## When this applies
 
-- You change a repository setting, the `main` ruleset, a required check, a label, or an Actions variable or secret.
-- A pull request that changes this directory has merged: run `pulumi preview`, then `pulumi up`.
+- You change a repository setting, the `main` ruleset, a required check, a label, a milestone, or an Actions variable or secret.
+- A pull request changes this directory: run `pulumi preview`, then `pulumi up`, from its branch before the merge go-ahead when its chunk's spec rolls it out there, otherwise from `main` after the merge ([docs/maintainers.md](../../docs/maintainers.md#before-merging-a-chunk)). Between a branch rollout and its merge, run no `pulumi up` from `main`: it would revert or delete the branch's changes on GitHub (labels, the ruleset, settings, variables), except milestones, which under `retainOnDelete` only leave Pulumi's state and would then need `pulumi import`.
 
 ## Contents
 
-- `index.ts`: every setting, the ruleset and its `requiredChecks`, the labels.
+- `index.ts`: every setting, the ruleset and its `requiredChecks`, the labels, the milestones.
 - `privateVulnerabilityReporting.ts`: a dynamic resource for the one setting the provider lacks (see Notes).
 - `Pulumi.yaml`: the project.
 - `Pulumi.prod.yaml`: the `prod` stack's configuration, secrets encrypted by the stack's key.
@@ -56,6 +56,7 @@ pulumi up
 - **Merging** is squash only, with the pull request title as the commit subject, in both the
   repository settings and the `main` ruleset.
 - **Labels** are authoritative: a label not listed in `index.ts` is deleted on `pulumi up`.
+- **Milestones** (M0 to M5) are created from `index.ts`; Pulumi ignores their `state`, so closing one at a milestone boundary is a `gh api` call ([docs/maintainers.md](../../docs/maintainers.md#when-a-milestone-completes)), not a change here. Never remove a milestone's entry from `index.ts`, even once it is closed: its issues point at it (`retainOnDelete` keeps it on GitHub, unmanaged). A milestone created by hand is not managed.
 - **The repository resource is protected** and has `archiveOnDestroy`, so `pulumi destroy`
   cannot delete the repository.
 - **Variables and secrets**:

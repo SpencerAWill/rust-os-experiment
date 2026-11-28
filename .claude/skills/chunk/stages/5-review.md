@@ -1,7 +1,7 @@
 # Stage 5: review
 
 0. **Research chunks** (spec `Kind: research`): skip the simplify pass unless a spike was written (then run it over the spike only). Reviewers are `review-spec`, `review-docs` and `review-sources`, always; `review-code` and `review-security` only for spike code; `review-conditional` only if the note recommends an interface or concurrency design (name which perspective). Dispatch them as in step 2, then continue from step 3; fixes to the note go to a `researcher`, fixes to spike code to a `builder`.
-1. **Simplify.** Dispatch one `builder` to run `/simplify` over `main...HEAD` (behaviour-preserving cleanups only). Check and commit its changes on their own: `refactor: simplify (<id>)`. No commit if nothing changed.
+1. **Simplify.** Dispatch one `builder` to run `/simplify` over `main...HEAD` (behaviour-preserving cleanups only), reading every changed source file in full; a report that lists files it skipped or only skimmed goes back. Check and commit its changes on their own: `refactor: simplify (<id>)`. No commit if nothing changed. If it moved tests into a shared helper, the red checks recorded before it no longer cover the code: re-run one per helper with the fixes (engine M3.26).
 2. **Review in parallel.** Dispatch fresh reviewers, each with the spec path, the diff range `main...HEAD` and the plan's lesson IDs, and nothing of your reasoning:
    - `review-code`, `review-security`, `review-docs`, `review-spec`, always;
    - `review-conditional`, naming which of interfaces and ABI, architecture portability, concurrency and memory ordering, and performance apply (see the table in CONTRIBUTING.md, "Reviews before a pull request"); the others are `n/a: <reason>`.
@@ -9,4 +9,5 @@
 3. **Triage** each finding: fix, or record why not (for the PR). Log the triage.
 4. **Fix.** Send the fixes to a `builder`; check and commit as in stage 4 (`fix: <what> (<id>)`).
 5. **Re-review** each fixed finding with a **fresh** reviewer of the same kind, never a continued one. After two rounds on the same finding without agreement, stop and ask the maintainer.
-6. Write each review's one-line result and agent file into `log.md` for the PR's Reviews section. Go to [stage 6](6-compound.md).
+6. **Re-verify.** After the last fix, run the full `cargo xtask ci` again on the final code commit: a run recorded before the simplify pass or the fixes no longer covers the code (engine M3.5). The same goes for the chunk's measurements: re-run them on the final code commit, or say in the pull request which commit each ran on (engine M3.6). In a research chunk, a spike run cited in the note ("measured here: <command>") is re-run if its spike's code changed after the run, and the note's citation then points at the new `log.md` entry; otherwise the pull request names the commit each cited run was on.
+7. Write each review's one-line result and agent file into `log.md` for the PR's Reviews section. Go to [stage 6](6-compound.md).

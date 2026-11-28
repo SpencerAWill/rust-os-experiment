@@ -4,7 +4,7 @@ An experiment in operating-system architecture in Rust: an exokernel that multip
 
 ## Status
 
-Experimental, and nothing boots yet. The repository starts with its workflow and its research: M1 answers the architecture questions (where each layer runs, the boot path, the exokernel interface, where the shim sits) before any kernel code is written. See [docs/roadmap.md](docs/roadmap.md) and [docs/research/](docs/research/README.md).
+Experimental, and nothing boots yet. The repository starts with its workflow and its research: M1 answers the architecture questions (where each layer runs, the boot path, the exokernel interface, where the shim sits) before any kernel code is written. See [docs/roadmap.md](docs/roadmap.md) for the milestones, the [GitHub milestones](https://github.com/SpencerAWill/rust-os-experiment/milestones) for their chunks, and [docs/research/](docs/research/README.md).
 
 ## How work is done
 
