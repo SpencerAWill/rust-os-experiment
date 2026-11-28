@@ -11,6 +11,7 @@
       "Bash(cargo xtask doc)",
       "Bash(cargo xtask deny)",
       "Bash(cargo xtask check-workflows)",
+      "Bash(cargo xtask check-settings)",
       "Bash(cargo xtask check-docs)",
       "Bash(cargo xtask doctor)",
       "Bash(cargo xtask refs)"

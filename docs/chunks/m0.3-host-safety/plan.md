@@ -51,7 +51,7 @@ The manual checks come first, in the order the sandbox would otherwise get in th
 
 ### Step 5: wire the check into CI and allow it (R5)
 
-- [ ] **Who:** main session (configuration).
+- [x] **Who:** main session (configuration).
 - **Files:** `.github/workflows/ci.yml`, `.claude/settings.json`.
 - **Test first:** `grep -c 'cargo xtask check-settings' .github/workflows/ci.yml` prints 0.
 - **Change:** a second step `- run: cargo xtask check-settings` after `cargo xtask check-workflows` in the `check-workflows` job; `"Bash(cargo xtask check-settings)"` in `permissions.allow` after `check-workflows`.
