@@ -739,6 +739,15 @@ fn long_option(name: &str) -> Option<String> {
     }
 }
 
+/// Options that make `git push` run a command or reach beyond `origin`, matched as `git`
+/// does: any prefix of the long name (at least `--` and one letter), without `=value`.
+fn command_option(name: &str) -> Option<String> {
+    const OPTIONS: [&str; 4] = ["--exec", "--receive-pack", "--repo", "--recurse-submodules"];
+    (name.len() >= 3 && OPTIONS.iter().any(|full| full.starts_with(name))).then(|| {
+        format!("`git push {name}` could run a command or push somewhere other than `origin`")
+    })
+}
+
 /// Checks the arguments after `git push`.
 fn check_push(args: &[String], current_branch: Option<&str>) -> Option<String> {
     let mut positionals: Vec<&str> = Vec::new();
@@ -748,9 +757,10 @@ fn check_push(args: &[String], current_branch: Option<&str>) -> Option<String> {
             continue;
         }
         match arg.as_str() {
-            "-o" | "--push-option" | "--repo" | "--receive-pack" | "--exec" => skip_next = true,
+            "-o" | "--push-option" => skip_next = true,
             long if long.starts_with("--") && long.len() > 2 => {
-                if let Some(reason) = long_option(long.split('=').next().unwrap_or(long)) {
+                let name = long.split('=').next().unwrap_or(long);
+                if let Some(reason) = command_option(name).or_else(|| long_option(name)) {
                     return Some(reason);
                 }
             }
@@ -761,6 +771,11 @@ fn check_push(args: &[String], current_branch: Option<&str>) -> Option<String> {
             }
             positional => positionals.push(positional),
         }
+    }
+    if let Some(repository) = positionals.first().filter(|r| **r != "origin") {
+        return Some(format!(
+            "`{repository}` is not `origin`, the only repository an agent may push to"
+        ));
     }
     let refspecs = positionals.get(1..).unwrap_or_default();
     if refspecs.is_empty() {
@@ -1169,5 +1184,81 @@ mod tests {
             decide_hook_input("not json", branch_of),
             Decision::Block(_)
         ));
+    }
+
+    fn block_reason(command: &str) -> String {
+        match decide(command, FEATURE) {
+            Decision::Block(reason) => reason,
+            Decision::Allow => panic!("should block: {command}"),
+        }
+    }
+
+    /// Shortest unambiguous prefixes in `git push -h` here: `--e` (exec), `--rece`
+    /// (receive-pack), `--rep` (repo), `--recu` (recurse-submodules); `--re` and `--r` are
+    /// ambiguous in git and refused too.
+    #[test]
+    fn blocks_options_that_run_commands() {
+        let cases = [
+            "git push --exec x origin f",
+            "git push --exec=x origin f",
+            "git push --e x origin f",
+            "git push --e=x origin f",
+            "git push --exe=x origin f",
+            "git push --receive-pack x origin f",
+            "git push --receive-pack=x origin f",
+            "git push --rece x origin f",
+            "git push --rece=x origin f",
+            "git push --receive=x origin f",
+            "git push --repo x f",
+            "git push --repo=x f",
+            "git push --rep x f",
+            "git push --rep=x f",
+            "git push --re=x origin f",
+            "git push --r=x origin f",
+            "git push --recurse-submodules origin f",
+            "git push --recurse-submodules=on-demand origin f",
+            "git push --recurse-submodules on-demand origin f",
+            "git push --recu origin f",
+            "git push --recu=check origin f",
+            "git push --recurse origin f",
+        ];
+        for command in cases {
+            let reason = block_reason(command);
+            assert!(!reason.is_empty(), "{command}");
+        }
+        assert!(block_reason("git push --exec=x origin f").contains("--exec"));
+        assert!(block_reason("git push --rep=x f").contains("--rep"));
+        assert!(block_reason("git push --recu origin f").contains("--recu"));
+    }
+
+    #[test]
+    fn blocks_other_repositories() {
+        let cases = [
+            "git push https://example.com/r.git f",
+            "git push git@example.com:r.git f",
+            "git push /tmp/other f",
+            "git push ../other f",
+            "git push upstream f",
+            "git push -u upstream f",
+            "git push upstream",
+            "git push -o x upstream f",
+        ];
+        for command in cases {
+            assert!(block_reason(command).contains("origin"), "{command}");
+        }
+    }
+
+    #[test]
+    fn allows_origin_pushes() {
+        for command in [
+            "git push origin f",
+            "git push -u origin f",
+            "git push",
+            "git push origin",
+            "git push --no-recurse-submodules origin f",
+            "git push -o ci.skip origin f",
+        ] {
+            assert_eq!(decide(command, FEATURE), Decision::Allow, "{command}");
+        }
     }
 }

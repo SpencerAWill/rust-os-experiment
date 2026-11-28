@@ -28,6 +28,6 @@ Every command rejects flags it does not know, and prints an install hint when a 
 | `check-docs` | Required READMEs and their Contents, relative links and anchors, lesson and rule files, the length of `AGENTS.md` (the conventions are in [docs/README.md](../docs/README.md#conventions)) |
 | `doctor` | Checks the toolchain, host tools, QEMU version, firmware and accelerator, smoke-boots each architecture's firmware (logs in `target/doctor/`), and reports the reference library; non-zero exit on any `FAIL` line |
 | `refs [--fetch]` | The reference library's state per entry (offline); `--fetch` downloads missing or changed entries over https, checks each SHA-256 and writes their text ([reference/README.md](../reference/README.md)) |
-| `guard-push` | The push guard behind `.claude/hooks/guard-push.sh`; reads a hook's JSON on stdin |
+| `guard-push` | The push guard behind `.claude/hooks/guard-push.sh`; reads a hook's JSON on stdin; also refuses `--exec`, `--receive-pack`, `--repo`, `--recurse-submodules` (any abbreviation) and a repository other than `origin` |
 
 Commands to build, run and test the kernels under QEMU arrive with M2.
