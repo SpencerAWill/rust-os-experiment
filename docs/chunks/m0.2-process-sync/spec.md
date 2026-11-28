@@ -1,6 +1,6 @@
 # M0.2: Process sync with rust-engine-experiment
 
-- **Status:** Accepted (2026-11-27); amended twice on 2026-11-27 (§4.3, a security review for chores; maintainer, after the security review and its re-review)
+- **Status:** Implemented (PR #14, 2026-11-27); accepted 2026-11-27 and amended twice on 2026-11-27 (§4.3, a security review for chores; maintainer, after the security review and its re-review)
 - **Kind:** build · **Milestone:** M0 (Repository foundations) · **Depends on:** M0.1 · **Decides:** no ADR (process and documentation; the GitHub writes are configuration, §4.9)
 - **Issue:** #13, the chunk issue `M0.2: Process sync with rust-engine-experiment`, created in the rollout's first step (§4.9) so the pull request can close it; tracking issue #2 until the rollout closes it
 - **Estimated size:** about 500 changed lines of Markdown, about 30 lines in `infra/github/index.ts`
@@ -191,9 +191,9 @@ These writes change GitHub, not the repository. Each is read back and recorded i
 
 ## 9. Done when
 
-- [ ] R1 to R5 and R7 to R10 have their evidence (in `log.md`, including the R3 and R8 grep lists), and `cargo xtask ci` passes on the final commit.
-- [ ] The maintainer has run `pulumi preview` and `pulumi up` from the branch (R6 in `log.md`).
-- [ ] R11 and R12 have their evidence in `log.md`, pushed before the merge go-ahead.
+- [x] R1 to R5 and R7 to R10 have their evidence (in `log.md`, including the R3 and R8 grep lists), and `cargo xtask ci` passes on the final commit (c82c1de6f4756b5bbce68e9d335bd7dad73b4161 after the review fixes, and 93070535364ab87107cf4c53b65b5996ca0d31b3 after the lessons).
+- [ ] The maintainer has run `pulumi preview` and `pulumi up` from the branch (R6 in `log.md`). Pending: the rollout, before the merge go-ahead.
+- [ ] R11 and R12 have their evidence in `log.md`, pushed before the merge go-ahead. Pending: after `pulumi up` (R11's items 1 and 2, #13 and the Order field, are in `log.md`).
 
 ## 10. Open questions
 

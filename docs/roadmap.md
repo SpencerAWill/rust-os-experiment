@@ -25,7 +25,7 @@ This table is frozen at M0.2: later chunks, M0.3 and M0.4 included, are GitHub i
 |---|---|---|---|---|
 | M0.0 | Repository foundations: the chunk workflow with build and research chunks, agent roles and skills, the push guard, `cargo xtask` process checks, CI, Pulumi-managed settings, the issue Project, ADRs 0001-0002, research notes from the initial architecture conversation | none | Done (PR #1) | [spec](chunks/m0.0-foundations/spec.md), [plan](chunks/m0.0-foundations/plan.md) |
 | M0.1 | Development environment: host tools and Rust targets, `cargo xtask doctor`, a local reference library of specifications, and the tool survey as a research note | M0.0 | Done (PR #11) | [spec](chunks/m0.1-dev-environment/spec.md), [plan](chunks/m0.1-dev-environment/plan.md) |
-| M0.2 | Process sync with rust-engine-experiment: planning state on GitHub (chunk issues, milestones, the Project's Order field), chores, the pause after the plan, the newer builder, simplify, re-verify and grill rules, and the engine's general lessons | M0.1 | In progress | [spec](chunks/m0.2-process-sync/spec.md) |
+| M0.2 | Process sync with rust-engine-experiment: planning state on GitHub (chunk issues, milestones, the Project's Order field), chores, the pause after the plan, the newer builder, simplify, re-verify and grill rules, and the engine's general lessons | M0.1 | Done (PR #14) | [spec](chunks/m0.2-process-sync/spec.md) |
 
 ## Later milestones
 

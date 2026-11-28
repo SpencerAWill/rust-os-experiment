@@ -1,6 +1,6 @@
 # M0.2 plan: Process sync with rust-engine-experiment
 
-- **Status:** Accepted (2026-11-27)
+- **Status:** Historical: executed in PR #14 (2026-11-27); the spec and the code are authoritative
 - **Spec:** [spec.md](spec.md). This plan argues from the spec; read both. Progress and surprises go in [log.md](log.md).
 
 ## 1. Approach
@@ -113,3 +113,6 @@ The full `cargo xtask ci` on the final commit, with its commit recorded in `log.
 <!-- Filled in during implementation: what differed from the plan and why, one line each. The story (sent-back versions, red checks, how something was measured) stays in log.md; point at it. "None" if nothing did. -->
 
 - Step 3 linked `SKILL.md` without its `#chore-n` anchor, and step 4 restored the anchor in `docs/workflow.md`, a file outside step 4's list: check-docs rejects an anchor that does not yet exist (log.md, 2026-11-27).
+- Stage 5 changed files after step 9: four rounds of review fixes to `SKILL.md`, the grill skill, `maintainers.md`, stage 7 and the infra README, and two amendments to spec §4.3 approved by the maintainer (log.md, review entries).
+- Step 9's trial found a gap in `next` (no open milestone), which was fixed in that step, as the plan allows (log.md).
+- The full ci was run on the lessons commit as well as on the final code commit, because stage 6 changed files after the re-verify run.

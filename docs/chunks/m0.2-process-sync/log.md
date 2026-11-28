@@ -1,6 +1,6 @@
 # M0.2 log: Process sync with rust-engine-experiment
 
-- **Status:** Living (2026-11-27). Log statuses: `Living (date)` while the chunk is open, `Historical: PR #n (date)` at close-out.
+- **Status:** Historical: PR #14 (2026-11-27). Log statuses: `Living (date)` while the chunk is open, `Historical: PR #n (date)` at close-out.
 
 <!-- Append-only. One or two lines per entry, written when it happens, not at the end:
 - <date> <tag> <text>
@@ -62,3 +62,4 @@ Tags: done, decision, surprise, dead-end, lesson? (a candidate lesson for stage 
   - review-spec (`.claude/agents/review-spec.md`): R1 to R5, R7 to R10 and R11 items 1 and 2 met; R6's preview, R11 items 3 to 8 and R12 are due in the stage 7 rollout.
   - review-conditional: not run; interfaces, portability, concurrency and performance are all n/a for a docs and configuration change.
 - 2026-11-27 done Compound. Added tooling-13 (empty GitHub results; wait for Project workflows), tooling-14 (a lane that reuses chunk roles: override their assumptions; resume re-checks inputs first), tooling-15 (zsh does not word-split unquoted variables) and xtask-7 (a lockfile-containment check compares `cargo tree --target all` against the lock). Edited tooling-7 (trial every lane and entry point a change adds) and tooling-12 (also `--head` fork branches and Project items' `content.repository`). Not kept: independent triggers in separate sentences (plain writing, below the capture gate); the scratchpad toolchain point (now in the grill skill); final CI after simplify (already specs-4 and the re-verify step).
+- 2026-11-27 done Stage 7: no follow-up issues. Pushed the branch; opened PR #14 (Closes #13). Close-out: spec Implemented, plan and log Historical, roadmap row Done (PR #14), spec §9 first item ticked; the pulumi and rollout items are pending until the merge wait.
