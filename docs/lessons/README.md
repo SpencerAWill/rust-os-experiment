@@ -14,8 +14,8 @@ A lesson is guidance an agent or contributor follows by default and may deviate 
 - [`docs.md`](docs.md): keeping rules in one place across the documents agents read, research-note citations, and `typos` in chunk logs.
 - [`infra.md`](infra.md): Pulumi resources that other GitHub data points at.
 - [`specs.md`](specs.md): writing specs and plans whose checks can pass, and claims about causes and existing code.
-- [`tooling.md`](tooling.md): hooks, permission rules, skills and container scripts for agents, and rules that read GitHub data.
-- [`xtask.md`](xtask.md): writing `cargo xtask` commands that read the repository.
+- [`tooling.md`](tooling.md): hooks, permission rules, skills and container scripts for agents, rules that read GitHub data, skill lanes that reuse chunk roles, and zsh word splitting.
+- [`xtask.md`](xtask.md): writing `cargo xtask` commands that read the repository, and checks that dependencies stay inside `Cargo.lock`.
 
 ## Format
 
