@@ -192,8 +192,8 @@ These writes change GitHub, not the repository. Each is read back and recorded i
 ## 9. Done when
 
 - [x] R1 to R5 and R7 to R10 have their evidence (in `log.md`, including the R3 and R8 grep lists), and `cargo xtask ci` passes on the final commit (c82c1de6f4756b5bbce68e9d335bd7dad73b4161 after the review fixes, and 93070535364ab87107cf4c53b65b5996ca0d31b3 after the lessons).
-- [ ] The maintainer has run `pulumi preview` and `pulumi up` from the branch (R6 in `log.md`). Pending: the rollout, before the merge go-ahead.
-- [ ] R11 and R12 have their evidence in `log.md`, pushed before the merge go-ahead. Pending: after `pulumi up` (R11's items 1 and 2, #13 and the Order field, are in `log.md`).
+- [x] The maintainer has run `pulumi preview` and `pulumi up` from the branch (R6 in `log.md`: 6 milestones created, 9 unchanged).
+- [x] R11 and R12 have their evidence in `log.md`, pushed before the merge go-ahead (items 1 to 8 read back; the dry run names M0.3, #10).
 
 ## 10. Open questions
 
