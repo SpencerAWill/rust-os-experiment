@@ -40,7 +40,7 @@ This chunk runs under the loop as it was when the spec was approved, so stage 7 
 
 ### Step 4: chunk skill and stages (R2, R3, R4; spec §4.8 items 1, 3 and 4)
 
-- [ ] **Who:** main session
+- [x] **Who:** main session
 - **Files:** `.claude/skills/chunk/SKILL.md`, `.claude/skills/chunk/stages/1-brainstorm.md`, `2-grill.md`, `3-plan.md`, `5-review.md`, `7-close-out.md`
 - **Test first:** `git grep -n -i roadmap .claude/skills/chunk` lists the reads and writes of the roadmap row (SKILL line 35, stages 1, 2, 3 and 7).
 - **Change:** from the engine's versions, with this repository's owner, repository and Project 8. These parts stay as they are here: research chunks in stages 3 and 5, step 0 of stage 5, and the review perspectives. The `chore #N` section also stops on an issue labelled `research`, and `next` leaves such issues out of its chore list (spec §4.3). The new re-verify step in stage 5 has the research wording of spec §4.8 item 4. The engine's `cargo hack` line is left out (spec §2).
@@ -111,3 +111,5 @@ The full `cargo xtask ci` on the final commit, with its commit recorded in `log.
 ## 5. Deviations
 
 <!-- Filled in during implementation: what differed from the plan and why, one line each. The story (sent-back versions, red checks, how something was measured) stays in log.md; point at it. "None" if nothing did. -->
+
+- Step 3 linked `SKILL.md` without its `#chore-n` anchor, and step 4 restored the anchor in `docs/workflow.md`, a file outside step 4's list: check-docs rejects an anchor that does not yet exist (log.md, 2026-11-27).

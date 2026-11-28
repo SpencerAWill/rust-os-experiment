@@ -16,7 +16,7 @@ Each chunk goes through seven stages, and the next chunk starts in a new session
 | 6. Compound | main session | Opus | edits to `docs/lessons/` and other docs | no |
 | 7. Close out | main session | Opus | PR, close-out commit, follow-up issues; after the go-ahead, the merge | **yes: merge go-ahead** |
 
-In Claude Code, `/chunk next` starts stage 1 for the next chunk, `/chunk resume` continues wherever the chunk is, `/chunk <stage>` runs one stage, and `/chunk chore #N` runs a chore ([its steps](../.claude/skills/chunk/SKILL.md)). Without Claude Code, follow the stage files in [`.claude/skills/chunk/stages/`](../.claude/skills/chunk/stages/) by hand; they are plain Markdown.
+In Claude Code, `/chunk next` starts stage 1 for the next chunk, `/chunk resume` continues wherever the chunk is, `/chunk <stage>` runs one stage, and `/chunk chore #N` runs a chore ([its steps](../.claude/skills/chunk/SKILL.md#chore-n)). Without Claude Code, follow the stage files in [`.claude/skills/chunk/stages/`](../.claude/skills/chunk/stages/) by hand; they are plain Markdown.
 
 - **Picking the next chunk:** in the current milestone (the open GitHub milestone with the lowest number), the scheduled chunk issue that is not in flight (no branch on origin, which stage 1 pushes at once, and no open pull request from this repository closing it) and has no open "blocked by" issue, with the lowest Order. The maintainer may name another; naming work that is not yet a scheduled chunk schedules it. The exact query is in [the chunk skill](../.claude/skills/chunk/SKILL.md#next).
 - **The main session does not write product or test code** in stages 4 and 5. It dispatches, checks each result against the step's file list, commits, and keeps the documents.
