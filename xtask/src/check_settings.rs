@@ -259,13 +259,18 @@ fn specifically_handled(path: &[&str]) -> bool {
 
 /// A finding for each key of the object at `path` that is not in `allowed`.
 fn closed_keys(root: &Value, path: &[&str], allowed: &[&str], findings: &mut Vec<String>) {
-    let Some(Value::Object(map)) = get(root, path).or((path.is_empty()).then_some(root)) else {
-        return;
-    };
     let name = if path.is_empty() {
         "the top level".to_string()
     } else {
         path.join(".")
+    };
+    let map = match get(root, path).or((path.is_empty()).then_some(root)) {
+        Some(Value::Object(map)) => map,
+        Some(_) => {
+            findings.push(format!("{name} must be an object"));
+            return;
+        }
+        None => return,
     };
     for key in map.keys().filter(|k| !allowed.contains(&k.as_str())) {
         // A key a specific rule below already refuses is reported there, with a clearer message.
@@ -967,9 +972,9 @@ mod tests {
         let cases: [(&[&str], &str); 6] = [
             (&[], "proxyAuthHelper"),
             (&["permissions"], "ask"),
-            (&["sandbox"], "allowPty"),
-            (&["sandbox", "filesystem"], "allowRead"),
-            (&["sandbox", "network"], "mitmProxy"),
+            (&["sandbox"], "processWrapper"),
+            (&["sandbox", "filesystem"], "extraKey"),
+            (&["sandbox", "network"], "extraKey"),
             (&["sandbox", "credentials"], "mode"),
         ];
         for (path, key) in cases {
@@ -984,11 +989,37 @@ mod tests {
                 findings.iter().any(|f| f.contains(key)),
                 "{path:?} {key}: {findings:?}"
             );
-            // Keys with a specific rule get that rule's message; the others the closed-set one.
-            if !["allowPty", "allowRead", "mitmProxy"].contains(&key) {
+            // No specific rule covers these keys, so only the closed-set rule can report them.
+            assert!(
+                findings.iter().any(|f| f.contains("not allowed")),
+                "{path:?} {key}: {findings:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn a_non_object_at_a_closed_level_is_a_finding() {
+        for path in [
+            &["permissions"][..],
+            &["sandbox"],
+            &["sandbox", "filesystem"],
+            &["sandbox", "network"],
+            &["sandbox", "credentials"],
+        ] {
+            for bad in [json!(5), json!(null), json!(["x"])] {
+                let findings = findings_after(|s| {
+                    let mut at = &mut *s;
+                    for p in &path[..path.len() - 1] {
+                        at = &mut at[*p];
+                    }
+                    at[path[path.len() - 1]] = bad.clone();
+                });
+                let name = path.join(".");
                 assert!(
-                    findings.iter().any(|f| f.contains("not allowed")),
-                    "{path:?} {key}: {findings:?}"
+                    findings
+                        .iter()
+                        .any(|f| f.contains(&name) && f.contains("must be an object")),
+                    "{path:?} {bad}: {findings:?}"
                 );
             }
         }
