@@ -12,7 +12,7 @@ Commands run on your machine. Pulumi Cloud only stores the state (stack `Spencer
 ## When this applies
 
 - You change a repository setting, the `main` ruleset, a required check, a label, a milestone, or an Actions variable or secret.
-- A pull request that changes this directory has merged: run `pulumi preview`, then `pulumi up`.
+- A pull request changes this directory: run `pulumi preview`, then `pulumi up`, from its branch before the merge go-ahead when its chunk's spec rolls it out there, otherwise from `main` after the merge ([docs/maintainers.md](../../docs/maintainers.md#before-merging-a-chunk)). Between a branch rollout and its merge, run no `pulumi up` from `main`: it would drop the new resources from Pulumi's state (milestones stay on GitHub under `retainOnDelete`, and would then need `pulumi import`).
 
 ## Contents
 
