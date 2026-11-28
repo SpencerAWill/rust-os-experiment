@@ -49,7 +49,7 @@ This chunk runs under the loop as it was when the spec was approved, so stage 7 
 
 ### Step 5: triage, grill and builder (R5; spec §4.8 items 2 and 5)
 
-- [ ] **Who:** main session
+- [x] **Who:** main session
 - **Files:** `.claude/skills/triage/SKILL.md`, `.claude/skills/grill/SKILL.md`, `.claude/agents/builder.md`
 - **Test first:** `grep -n 'Order' .claude/skills/triage/SKILL.md` finds nothing; `grep -n 'Compile it' .claude/skills/grill/SKILL.md` finds nothing; `grep -n 'Shell' .claude/agents/builder.md` finds nothing.
 - **Change:** as the engine did. The builder's shell rule drops the engine's "(M3.6)" tag. The grill's example cites "engine M3.3".
