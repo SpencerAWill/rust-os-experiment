@@ -39,7 +39,7 @@ The manual checks come first, in the order the sandbox would otherwise get in th
 
 ### Step 4: `cargo xtask check-settings` (R5)
 
-- [ ] **Who:** builder.
+- [x] **Who:** builder.
 - **Files:** `xtask/src/check_settings.rs` (new), `xtask/src/main.rs`.
 - **Test first:** in `check_settings.rs`, the unit tests of spec §8 R5 against small JSON values built in the test, plus one that runs the check on the committed file (`include_str!("../../.claude/settings.json")`); they fail because `check` is a `todo!()`. Then the `ci_steps_are_the_ported_set` test in `main.rs` with `Command::CheckSettings` after `Command::CheckWorkflows`, which fails until `ci_steps` changes.
 - **Change:**

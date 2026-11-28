@@ -1,0 +1,592 @@
+//! `check-settings`: keeps the agent guardrails in `.claude/settings.json` in place.
+//!
+//! The rules (spec M0.3 §4.3), every finding listed:
+//!
+//! 1. `permissions.deny` holds every rule of [`REQUIRED_DENY`] (more are allowed).
+//! 2. `sandbox.enabled` and `sandbox.failIfUnavailable` are `true`, and
+//!    `sandbox.allowUnsandboxedCommands` is `false`.
+//! 3. The lists that harden hold their required entries: `sandbox.filesystem.denyRead`
+//!    ([`REQUIRED_DENY_READ`]) and `sandbox.credentials.envVars` with mode `deny`
+//!    ([`REQUIRED_CREDENTIAL_DENY`]); more are allowed.
+//! 4. The lists that relax hold only entries of their allowlist, compared exactly (no prefix,
+//!    no wildcard unless listed): `sandbox.excludedCommands` ([`EXCLUDED_ALLOWLIST`]),
+//!    `sandbox.filesystem.allowWrite` ([`WRITE_PATH_ALLOWLIST`]), `sandbox.network.allowedDomains`
+//!    ([`DOMAIN_ALLOWLIST`]) and `sandbox.network.allowMachLookup` ([`MACH_LOOKUP_ALLOWLIST`],
+//!    empty).
+//! 5. `sandbox.network.allowLocalBinding` and `allowAllUnixSockets` are not set to anything but
+//!    `false`, `allowUnixSockets` has no entry, and `sandbox.filesystem.allowRead` has no entry.
+//! 6. `permissions.allow` has no bare tool name (`Bash`, `Read`, `Edit`, `Write`) and no
+//!    `Bash(*)`.
+//! 7. The file is valid JSON and each field above has the right type.
+//!
+//! It reads only `.claude/settings.json` (the shared file, not `settings.local.json`), writes
+//! nothing and runs no program. The repository root is the parent of this crate's directory, so
+//! the result does not depend on the caller's current directory.
+
+use std::fs;
+use std::path::Path;
+
+use serde_json::Value;
+
+/// The file checked, relative to the repository root.
+const SETTINGS_PATH: &str = ".claude/settings.json";
+
+/// The `permissions.deny` rules of spec §4.2, matched as exact strings.
+const REQUIRED_DENY: &[&str] = &[
+    "Bash(sudo *)",
+    "Bash(diskutil *)",
+    "Bash(dd *)",
+    "Bash(hdiutil *)",
+    "Bash(launchctl *)",
+    "Bash(tmutil *)",
+    "Bash(csrutil *)",
+    "Bash(nvram *)",
+    "Bash(osascript *)",
+    "Bash(security *)",
+    "Bash(shutdown *)",
+    "Bash(reboot *)",
+    "Bash(halt *)",
+    "Bash(brew install *)",
+    "Bash(brew reinstall *)",
+    "Bash(brew upgrade *)",
+    "Bash(brew uninstall *)",
+    "Bash(brew remove *)",
+    "Bash(brew rm *)",
+    "Bash(brew autoremove *)",
+    "Bash(brew bundle *)",
+    "Read(~/.ssh/**)",
+    "Read(~/.aws/**)",
+    "Read(~/.gnupg/**)",
+    "Read(~/.config/gh/**)",
+    "Read(~/Library/Keychains/**)",
+    "Read(~/.netrc)",
+    "Read(~/.git-credentials)",
+    "Read(~/.cargo/credentials.toml)",
+    "Read(~/.cargo/credentials)",
+    "Edit(/.git/hooks/**)",
+    "Edit(/.git/config)",
+];
+
+/// The paths `sandbox.filesystem.denyRead` must hold (spec §4.1.5).
+const REQUIRED_DENY_READ: &[&str] = &[
+    "~/.ssh",
+    "~/.aws",
+    "~/.gnupg",
+    "~/.config/gh",
+    "~/Library/Keychains",
+    "~/.netrc",
+    "~/.git-credentials",
+    "~/.cargo/credentials.toml",
+    "~/.cargo/credentials",
+];
+
+/// The environment variables a sandboxed command must not see, each with mode `deny` (§4.1.6).
+const REQUIRED_CREDENTIAL_DENY: &[&str] = &[
+    "GH_TOKEN",
+    "GITHUB_TOKEN",
+    "GH_ENTERPRISE_TOKEN",
+    "CARGO_REGISTRY_TOKEN",
+];
+
+/// The commands that may run outside the sandbox (`sandbox.excludedCommands`), compared exactly.
+///
+/// Each entry needs a reason, written in a comment above it. All of them fail sandboxed because
+/// the `Read` deny rules of spec §4.2.2 also deny `~/.config/gh` and the keychain to sandboxed
+/// commands (`log.md`, 2026-11-28); an excluded command runs alone in its Bash call. Not `gh *`,
+/// which would also exclude `gh extension` and `gh alias --shell`.
+const EXCLUDED_ALLOWLIST: &[&str] = &[
+    // The loop's REST and GraphQL calls; needs the token in `~/.config/gh`.
+    "gh api *",
+    // Reads and writes issues (chunk issues, follow-ups); needs the token.
+    "gh issue *",
+    // Opens and reads pull requests; needs the token.
+    "gh pr *",
+    // Reads and updates the "OS backlog" Project (user-owned Project 8); needs the token.
+    "gh project *",
+    // Creates and edits labels; needs the token.
+    "gh label *",
+    // Searches issues and pull requests; needs the token.
+    "gh search *",
+    // Shows whether `gh` is logged in; reads the token's config.
+    "gh auth status",
+    // Pushes the chunk branch; the `osxkeychain` credential helper needs the keychain.
+    "git push *",
+];
+
+/// The paths outside the repository a sandboxed command may write (`sandbox.filesystem.allowWrite`).
+const WRITE_PATH_ALLOWLIST: &[&str] = &[
+    // The lock `cargo deny` takes when it fetches the RustSec advisory database
+    // (`log.md`, 2026-11-28); `~/.cargo` as a whole and `~/.rustup` were not needed.
+    "~/.cargo/advisory-dbs",
+];
+
+/// The hosts a sandboxed command may reach without approval (`sandbox.network.allowedDomains`).
+const DOMAIN_ALLOWLIST: &[&str] = &[
+    // `cargo deny` fetches `https://github.com/RustSec/advisory-db`, and `git fetch` reads the
+    // public repository.
+    "github.com",
+];
+
+/// The Mach services a sandboxed command may look up (`sandbox.network.allowMachLookup`).
+///
+/// Empty: `com.apple.sysmond` would fix only the `doctor` sweep's `pgrep` listing and would let
+/// every sandboxed command list the host's processes and their arguments (spec §4.1.3).
+const MACH_LOOKUP_ALLOWLIST: &[&str] = &[];
+
+/// Tool names that, bare in `permissions.allow`, allow every call of the tool.
+const BARE_TOOLS: &[&str] = &["Bash", "Read", "Edit", "Write"];
+
+/// The value at `path` below `root`, if every key exists.
+fn get<'a>(root: &'a Value, path: &[&str]) -> Option<&'a Value> {
+    path.iter().try_fold(root, |v, key| v.get(key))
+}
+
+/// The strings of the array at `path` (an absent key is an empty list). A wrong type is a
+/// finding, and so is each element that is not a string.
+fn string_list<'a>(root: &'a Value, path: &[&str], findings: &mut Vec<String>) -> Vec<&'a str> {
+    let name = path.join(".");
+    match get(root, path) {
+        None => Vec::new(),
+        Some(Value::Array(items)) => items
+            .iter()
+            .filter_map(|item| {
+                let s = item.as_str();
+                if s.is_none() {
+                    findings.push(format!("{name} has an entry that is not a string: {item}"));
+                }
+                s
+            })
+            .collect(),
+        Some(other) => {
+            findings.push(format!("{name} must be an array of strings, found {other}"));
+            Vec::new()
+        }
+    }
+}
+
+/// A finding unless the boolean at `path` is exactly `expected`.
+fn require_bool(root: &Value, path: &[&str], expected: bool, findings: &mut Vec<String>) {
+    let name = path.join(".");
+    match get(root, path) {
+        Some(Value::Bool(b)) if *b == expected => {}
+        Some(Value::Bool(_)) => findings.push(format!("{name} must be {expected}")),
+        Some(other) => findings.push(format!("{name} must be {expected}, found {other}")),
+        None => findings.push(format!("{name} is missing and must be {expected}")),
+    }
+}
+
+/// A finding unless the boolean at `path` is `false` or absent (a switch that relaxes).
+fn forbid_true(root: &Value, path: &[&str], findings: &mut Vec<String>) {
+    let name = path.join(".");
+    match get(root, path) {
+        None | Some(Value::Bool(false)) => {}
+        Some(other) => findings.push(format!("{name} must be false or absent, found {other}")),
+    }
+}
+
+/// A finding for each missing entry of `required` in the list at `path`.
+fn require_entries(root: &Value, path: &[&str], required: &[&str], findings: &mut Vec<String>) {
+    let have = string_list(root, path, findings);
+    for entry in required {
+        if !have.contains(entry) {
+            findings.push(format!("{} is missing `{entry}`", path.join(".")));
+        }
+    }
+}
+
+/// A finding for each entry of the list at `path` that is not in `allowed` (exact comparison).
+fn allow_only(root: &Value, path: &[&str], allowed: &[&str], findings: &mut Vec<String>) {
+    for entry in string_list(root, path, findings) {
+        if !allowed.contains(&entry) {
+            findings.push(format!(
+                "{} has `{entry}`, which is not in the allowlist in xtask/src/check_settings.rs",
+                path.join(".")
+            ));
+        }
+    }
+}
+
+/// Rule 3, credentials: each required variable has an entry with that name and mode `deny`.
+fn check_credentials(root: &Value, findings: &mut Vec<String>) {
+    let path = ["sandbox", "credentials", "envVars"];
+    let entries: &[Value] = match get(root, &path) {
+        None => &[],
+        Some(Value::Array(items)) => items,
+        Some(other) => {
+            findings.push(format!(
+                "{} must be an array, found {other}",
+                path.join(".")
+            ));
+            return;
+        }
+    };
+    for name in REQUIRED_CREDENTIAL_DENY {
+        let denied = entries
+            .iter()
+            .any(|e| e["name"] == *name && e["mode"] == "deny");
+        if !denied {
+            findings.push(format!(
+                "{} has no entry with name `{name}` and mode `deny`",
+                path.join(".")
+            ));
+        }
+    }
+}
+
+/// Every finding in `settings`, one message each.
+fn check(settings: &Value) -> Vec<String> {
+    if !settings.is_object() {
+        return vec!["the settings file must hold a JSON object".to_string()];
+    }
+    let mut findings = Vec::new();
+    let f = &mut findings;
+
+    require_entries(settings, &["permissions", "deny"], REQUIRED_DENY, f);
+    for entry in string_list(settings, &["permissions", "allow"], f) {
+        if BARE_TOOLS.contains(&entry) || entry == "Bash(*)" {
+            f.push(format!(
+                "permissions.allow has `{entry}`, which allows every call of the tool"
+            ));
+        }
+    }
+
+    require_bool(settings, &["sandbox", "enabled"], true, f);
+    require_bool(settings, &["sandbox", "failIfUnavailable"], true, f);
+    require_bool(settings, &["sandbox", "allowUnsandboxedCommands"], false, f);
+
+    require_entries(
+        settings,
+        &["sandbox", "filesystem", "denyRead"],
+        REQUIRED_DENY_READ,
+        f,
+    );
+    check_credentials(settings, f);
+
+    allow_only(
+        settings,
+        &["sandbox", "excludedCommands"],
+        EXCLUDED_ALLOWLIST,
+        f,
+    );
+    allow_only(
+        settings,
+        &["sandbox", "filesystem", "allowWrite"],
+        WRITE_PATH_ALLOWLIST,
+        f,
+    );
+    allow_only(
+        settings,
+        &["sandbox", "network", "allowedDomains"],
+        DOMAIN_ALLOWLIST,
+        f,
+    );
+    allow_only(
+        settings,
+        &["sandbox", "network", "allowMachLookup"],
+        MACH_LOOKUP_ALLOWLIST,
+        f,
+    );
+
+    forbid_true(settings, &["sandbox", "network", "allowLocalBinding"], f);
+    forbid_true(settings, &["sandbox", "network", "allowAllUnixSockets"], f);
+    allow_only(
+        settings,
+        &["sandbox", "network", "allowUnixSockets"],
+        &[],
+        f,
+    );
+    allow_only(settings, &["sandbox", "filesystem", "allowRead"], &[], f);
+
+    findings
+}
+
+/// Every finding in the text of a settings file (rule 7: invalid JSON is one).
+fn check_text(text: &str) -> Vec<String> {
+    match serde_json::from_str::<Value>(text) {
+        Ok(settings) => check(&settings),
+        Err(e) => vec![format!("{SETTINGS_PATH} is not valid JSON: {e}")],
+    }
+}
+
+pub(crate) fn run() -> Result<(), String> {
+    let root = Path::new(env!("CARGO_MANIFEST_DIR"))
+        .parent()
+        .ok_or("cannot find the repository root")?;
+    let text = fs::read_to_string(root.join(SETTINGS_PATH))
+        .map_err(|e| format!("{SETTINGS_PATH}: {e}"))?;
+    let findings = check_text(&text);
+    if findings.is_empty() {
+        println!("check-settings: ok");
+        Ok(())
+    } else {
+        for finding in &findings {
+            println!("{SETTINGS_PATH}: {finding}");
+        }
+        Err(format!(
+            "check-settings: {} finding(s) in {SETTINGS_PATH}",
+            findings.len()
+        ))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use serde_json::json;
+
+    const COMMITTED: &str = include_str!("../../.claude/settings.json");
+
+    fn committed() -> Value {
+        serde_json::from_str(COMMITTED).expect("the committed settings are valid JSON")
+    }
+
+    /// The findings after `change` is applied to the committed settings.
+    fn findings_after(change: impl FnOnce(&mut Value)) -> Vec<String> {
+        let mut settings = committed();
+        change(&mut settings);
+        check(&settings)
+    }
+
+    /// Asserts exactly one finding, and that it mentions `needle`.
+    fn assert_one(findings: &[String], needle: &str) {
+        assert_eq!(findings.len(), 1, "{findings:?}");
+        assert!(findings[0].contains(needle), "{findings:?}");
+    }
+
+    fn remove_entry(list: &mut Value, entry: &str) {
+        list.as_array_mut().unwrap().retain(|e| e != entry);
+    }
+
+    #[test]
+    fn the_committed_file_passes() {
+        assert_eq!(check_text(COMMITTED), Vec::<String>::new());
+    }
+
+    #[test]
+    fn a_crlf_copy_of_the_committed_file_passes() {
+        let crlf = COMMITTED.replace("\r\n", "\n").replace('\n', "\r\n");
+        assert!(crlf.contains("\r\n"));
+        assert_eq!(check_text(&crlf), Vec::<String>::new());
+    }
+
+    #[test]
+    fn every_required_deny_rule_is_in_the_committed_file() {
+        let settings = committed();
+        let deny = settings["permissions"]["deny"].as_array().unwrap();
+        for rule in REQUIRED_DENY {
+            assert!(deny.iter().any(|d| d == rule), "{rule}");
+        }
+    }
+
+    #[test]
+    fn a_missing_deny_rule_is_named() {
+        let findings = findings_after(|s| {
+            remove_entry(&mut s["permissions"]["deny"], "Bash(security *)");
+        });
+        assert_one(&findings, "Bash(security *)");
+    }
+
+    #[test]
+    fn a_deny_rule_in_another_form_does_not_count() {
+        let findings = findings_after(|s| {
+            let deny = s["permissions"]["deny"].as_array_mut().unwrap();
+            let sudo = deny.iter_mut().find(|d| *d == "Bash(sudo *)").unwrap();
+            *sudo = json!("Bash(sudo:*)");
+        });
+        assert_one(&findings, "Bash(sudo *)");
+    }
+
+    #[test]
+    fn sandbox_enabled_false_or_absent_is_a_finding() {
+        let off = findings_after(|s| s["sandbox"]["enabled"] = json!(false));
+        assert_one(&off, "sandbox.enabled");
+        let absent = findings_after(|s| {
+            s["sandbox"].as_object_mut().unwrap().remove("enabled");
+        });
+        assert_one(&absent, "sandbox.enabled");
+    }
+
+    #[test]
+    fn fail_if_unavailable_false_or_absent_is_a_finding() {
+        let off = findings_after(|s| s["sandbox"]["failIfUnavailable"] = json!(false));
+        assert_one(&off, "sandbox.failIfUnavailable");
+        let absent = findings_after(|s| {
+            s["sandbox"]
+                .as_object_mut()
+                .unwrap()
+                .remove("failIfUnavailable");
+        });
+        assert_one(&absent, "sandbox.failIfUnavailable");
+    }
+
+    #[test]
+    fn unsandboxed_commands_allowed_is_a_finding() {
+        let findings = findings_after(|s| s["sandbox"]["allowUnsandboxedCommands"] = json!(true));
+        assert_one(&findings, "sandbox.allowUnsandboxedCommands");
+    }
+
+    #[test]
+    fn a_missing_deny_read_path_is_named() {
+        let findings = findings_after(|s| {
+            remove_entry(&mut s["sandbox"]["filesystem"]["denyRead"], "~/.config/gh");
+        });
+        assert_one(&findings, "~/.config/gh");
+    }
+
+    #[test]
+    fn a_missing_credential_deny_is_named() {
+        let findings = findings_after(|s| {
+            s["sandbox"]["credentials"]["envVars"]
+                .as_array_mut()
+                .unwrap()
+                .retain(|e| e["name"] != "GH_TOKEN");
+        });
+        assert_one(&findings, "GH_TOKEN");
+    }
+
+    #[test]
+    fn a_credential_with_the_right_name_and_mode_mask_is_a_finding() {
+        let findings = findings_after(|s| {
+            let vars = s["sandbox"]["credentials"]["envVars"]
+                .as_array_mut()
+                .unwrap();
+            let gh = vars.iter_mut().find(|e| e["name"] == "GH_TOKEN").unwrap();
+            gh["mode"] = json!("mask");
+        });
+        assert_one(&findings, "GH_TOKEN");
+    }
+
+    #[test]
+    fn an_unlisted_exclusion_is_a_finding_including_wildcards() {
+        for entry in ["gh *", "*", "~", "git push", "git push *; true"] {
+            let findings = findings_after(|s| {
+                s["sandbox"]["excludedCommands"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!(entry));
+            });
+            assert_one(&findings, entry);
+        }
+    }
+
+    #[test]
+    fn an_unlisted_write_path_is_a_finding_by_exact_match() {
+        // `~/.cargo` is a prefix of the listed path and `~/.cargo/..` starts with it.
+        for entry in [
+            "~",
+            "~/.cargo",
+            "~/.cargo/..",
+            "~/.cargo/advisory-dbs/",
+            "*",
+        ] {
+            let findings = findings_after(|s| {
+                s["sandbox"]["filesystem"]["allowWrite"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!(entry));
+            });
+            assert_one(&findings, entry);
+        }
+    }
+
+    #[test]
+    fn an_unlisted_domain_is_a_finding_including_a_wildcard_over_a_listed_one() {
+        for entry in ["*", "*.github.com", "example.com"] {
+            let findings = findings_after(|s| {
+                s["sandbox"]["network"]["allowedDomains"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!(entry));
+            });
+            assert_one(&findings, entry);
+        }
+    }
+
+    #[test]
+    fn any_mach_service_is_a_finding() {
+        let findings = findings_after(|s| {
+            s["sandbox"]["network"]["allowMachLookup"] = json!(["com.apple.sysmond"]);
+        });
+        assert_one(&findings, "com.apple.sysmond");
+    }
+
+    #[test]
+    fn local_binding_true_is_a_finding() {
+        let findings =
+            findings_after(|s| s["sandbox"]["network"]["allowLocalBinding"] = json!(true));
+        assert_one(&findings, "allowLocalBinding");
+    }
+
+    #[test]
+    fn a_unix_socket_entry_is_a_finding() {
+        let findings = findings_after(|s| {
+            s["sandbox"]["network"]["allowUnixSockets"] = json!(["/var/run/docker.sock"]);
+        });
+        assert_one(&findings, "/var/run/docker.sock");
+    }
+
+    #[test]
+    fn all_unix_sockets_true_is_a_finding() {
+        let findings =
+            findings_after(|s| s["sandbox"]["network"]["allowAllUnixSockets"] = json!(true));
+        assert_one(&findings, "allowAllUnixSockets");
+    }
+
+    #[test]
+    fn an_allow_read_entry_is_a_finding() {
+        let findings = findings_after(|s| {
+            s["sandbox"]["filesystem"]["allowRead"] = json!(["~/.config/gh"]);
+        });
+        assert_one(&findings, "allowRead");
+    }
+
+    #[test]
+    fn a_bare_tool_allow_is_a_finding() {
+        for entry in ["Bash", "Read", "Edit", "Write", "Bash(*)"] {
+            let findings = findings_after(|s| {
+                s["permissions"]["allow"]
+                    .as_array_mut()
+                    .unwrap()
+                    .push(json!(entry));
+            });
+            assert_one(&findings, &format!("`{entry}`"));
+        }
+    }
+
+    #[test]
+    fn invalid_json_is_a_finding() {
+        let findings = check_text("{ not json");
+        assert_one(&findings, "not valid JSON");
+    }
+
+    #[test]
+    fn a_wrong_type_is_a_finding() {
+        let string_enabled = findings_after(|s| s["sandbox"]["enabled"] = json!("true"));
+        assert_one(&string_enabled, "sandbox.enabled");
+        let object_deny = findings_after(|s| s["permissions"]["deny"] = json!({}));
+        assert!(
+            object_deny
+                .iter()
+                .any(|f| f.contains("permissions.deny must be an array")),
+            "{object_deny:?}"
+        );
+        let number_entry = findings_after(|s| {
+            s["sandbox"]["excludedCommands"]
+                .as_array_mut()
+                .unwrap()
+                .push(json!(1));
+        });
+        assert_one(&number_entry, "not a string");
+        assert_eq!(check(&json!([])).len(), 1);
+    }
+
+    #[test]
+    fn every_finding_is_listed() {
+        let findings = findings_after(|s| {
+            s["sandbox"]["enabled"] = json!(false);
+            s["sandbox"]["network"]["allowLocalBinding"] = json!(true);
+            remove_entry(&mut s["permissions"]["deny"], "Bash(dd *)");
+        });
+        assert_eq!(findings.len(), 3, "{findings:?}");
+    }
+}

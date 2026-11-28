@@ -5,6 +5,7 @@
 //! `cargo xtask <command>`: the single entry point that CI and humans both run.
 
 mod check_docs;
+mod check_settings;
 mod check_workflows;
 mod cmd;
 mod doctor;
@@ -30,6 +31,7 @@ enum Command {
     Deny,
     Typos,
     CheckWorkflows,
+    CheckSettings,
     CheckDocs,
     Doctor,
     Refs {
@@ -44,7 +46,7 @@ enum Command {
 /// Parses command-line arguments (without the program name).
 fn parse(args: &[&str]) -> Result<Command, String> {
     let (name, flags) = args.split_first().ok_or_else(|| {
-        "missing command (try: ci [--quick], fmt [--check], clippy, test, doc, deny, typos, check-workflows, check-docs, doctor, refs [--fetch])"
+        "missing command (try: ci [--quick], fmt [--check], clippy, test, doc, deny, typos, check-workflows, check-settings, check-docs, doctor, refs [--fetch])"
             .to_string()
     })?;
     let has = |flag: &str| flags.contains(&flag);
@@ -67,6 +69,7 @@ fn parse(args: &[&str]) -> Result<Command, String> {
         "deny" => only(&[]).map(|()| Command::Deny),
         "typos" => only(&[]).map(|()| Command::Typos),
         "check-workflows" => only(&[]).map(|()| Command::CheckWorkflows),
+        "check-settings" => only(&[]).map(|()| Command::CheckSettings),
         "check-docs" => only(&[]).map(|()| Command::CheckDocs),
         "doctor" => only(&[]).map(|()| Command::Doctor),
         "refs" => only(&["--fetch"]).map(|()| Command::Refs {
@@ -150,6 +153,7 @@ fn ci_steps(quick: bool) -> Vec<Command> {
             },
             Command::Doc,
             Command::CheckWorkflows,
+            Command::CheckSettings,
             Command::CheckDocs,
             Command::Typos,
             Command::Deny,
@@ -198,6 +202,7 @@ fn execute(command: &Command) -> Result<(), String> {
             run("typos", &[], &[])
         }
         Command::CheckWorkflows => check_workflows::run(),
+        Command::CheckSettings => check_settings::run(),
         Command::CheckDocs => check_docs::run(),
         Command::Doctor => doctor::run(),
         Command::Refs { fetch } => refs::run(*fetch),
@@ -233,6 +238,8 @@ mod tests {
         assert_eq!(parse(&["fmt", "--check"]), Ok(Command::Fmt { check: true }));
         assert_eq!(parse(&["ci", "--quick"]), Ok(Command::Ci { quick: true }));
         assert_eq!(parse(&["check-docs"]), Ok(Command::CheckDocs));
+        assert_eq!(parse(&["check-settings"]), Ok(Command::CheckSettings));
+        assert!(parse(&["check-settings", "--x"]).is_err());
         assert_eq!(parse(&["guard-push"]), Ok(Command::GuardPush));
         assert!(parse(&["test", "--bogus"]).is_err());
     }
@@ -290,6 +297,7 @@ mod tests {
             },
             Command::Doc,
             Command::CheckWorkflows,
+            Command::CheckSettings,
             Command::CheckDocs,
             Command::Typos,
             Command::Deny,
